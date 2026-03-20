@@ -14,8 +14,7 @@
       </button>
     </div>
     <div class="mx-4 rounded-2xl overflow-hidden bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm">
-      <div
-        v-for="(bill, i) in bills" :key="bill.name"
+      <div v-for="(bill, i) in bills" :key="bill.name"
         :class="['flex items-center gap-3 px-4 py-3.5',
           i < bills.length - 1 ? 'border-b border-slate-100 dark:border-zinc-800/60' : '']"
       >
@@ -46,8 +45,7 @@
       </button>
     </div>
     <div class="flex gap-2.5 px-4 overflow-x-auto scrollbar-hide">
-      <div
-        v-for="g in goals" :key="g.label"
+      <div v-for="g in goals" :key="g.label"
         class="flex flex-col items-center gap-2 flex-shrink-0 min-w-[88px] bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 rounded-2xl p-4 shadow-sm"
       >
         <div class="relative">
@@ -62,7 +60,6 @@
           <span class="absolute inset-0 flex items-center justify-center text-[11px] font-black text-slate-800 dark:text-zinc-100">
             {{ g.pct }}%
           </span>
-          <!-- Icon pin -->
           <div class="absolute -top-1.5 -right-2 w-5 h-5 bg-white dark:bg-zinc-900 rounded-full flex items-center justify-center shadow-sm border border-slate-100 dark:border-zinc-800">
             <component :is="g.icon" :size="11" class="text-violet-500" :stroke-width="2.5" />
           </div>
@@ -77,8 +74,7 @@
       <h3 class="text-[15px] font-bold text-slate-800 dark:text-zinc-200">Tools</h3>
     </div>
     <div class="mx-4 rounded-2xl overflow-hidden bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm">
-      <button
-        v-for="(tool, i) in tools" :key="tool.label"
+      <button v-for="(tool, i) in tools" :key="tool.label"
         :class="['w-full flex items-center gap-3 px-4 py-3.5 text-left active:bg-slate-50 dark:active:bg-zinc-800 transition-colors',
           i < tools.length - 1 ? 'border-b border-slate-100 dark:border-zinc-800/60' : '']"
       >
@@ -93,13 +89,23 @@
       </button>
     </div>
 
+    <!-- ── Developer Controls (always visible) ── -->
+    <div class="px-5 pt-6 pb-3">
+      <h3 class="text-[15px] font-bold text-rose-400 dark:text-rose-500 flex items-center gap-2">
+        <FlaskConical :size="15" :stroke-width="2" />
+        Developer
+      </h3>
+    </div>
+    <DevResetButton />
+
     <div class="h-6"></div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { Plus, ChevronRight, Sliders, BarChart2, PieChart, Settings } from 'lucide-vue-next'
+import { Plus, ChevronRight, Sliders, BarChart2, PieChart, Settings, FlaskConical } from 'lucide-vue-next'
 import { bills, goals } from '../composables/useStore'
+import DevResetButton from '../components/DevResetButton.vue'
 
 const tools = [
   { icon: Sliders,   label: 'Budget Limits', sub: 'Set monthly spending caps' },

@@ -1,19 +1,42 @@
 // composables/useDark.ts
-// Toggles Tailwind's dark class on <html> so dark: variants work globally.
-// Call once anywhere — the state is module-level so it's shared.
+// Persists dark mode preference to localStorage so it survives app restarts.
+// Falls back to OS preference on very first launch.
 
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch } from 'vue'
 
-const isDark = ref(false)
+const STORAGE_KEY = 'orb_dark_mode'
+
+// Read persisted value immediately (before any reactivity)
+function readPersistedDark(): boolean {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored !== null) return stored === 'true'
+  } catch {}
+  // First launch — respect OS preference
+  try {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches
+  } catch {}
+  return false
+}
+
+// Module-level singleton so state is shared across all callers
+const isDark = ref(false) // initialised properly in initDark()
+
+function applyDark(dark: boolean) {
+  document.documentElement.classList.toggle('dark', dark)
+}
 
 watch(isDark, (dark) => {
-  document.documentElement.classList.toggle('dark', dark)
-}, { immediate: true })
+  applyDark(dark)
+  try { localStorage.setItem(STORAGE_KEY, String(dark)) } catch {}
+})
 
 export function useDark() {
   function initDark() {
-    // Respect OS preference on first load
-    isDark.value = window.matchMedia('(prefers-color-scheme: dark)').matches
+    const dark = readPersistedDark()
+    isDark.value = dark
+    // Apply immediately (before Vue's watch fires) to avoid flash
+    applyDark(dark)
   }
 
   function toggleDark() {
