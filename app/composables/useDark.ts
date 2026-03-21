@@ -1,47 +1,96 @@
 // composables/useDark.ts
-// Persists dark mode preference to localStorage so it survives app restarts.
-// Falls back to OS preference on very first launch.
+// Supports: 'light' | 'dark' | 'system' | 'adaptive'
+// adaptive = light 6am-8pm, dark 8pm-6am
+// system   = follows OS prefers-color-scheme
 
 import { ref, watch } from 'vue'
 
+export type DarkMode = 'light' | 'dark' | 'system' | 'adaptive'
 const STORAGE_KEY = 'orb_dark_mode'
 
-// Read persisted value immediately (before any reactivity)
-function readPersistedDark(): boolean {
+function readMode(): DarkMode {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored !== null) return stored === 'true'
+    const s = localStorage.getItem(STORAGE_KEY)
+    if (s === 'light' || s === 'dark' || s === 'system' || s === 'adaptive') return s
   } catch {}
-  // First launch — respect OS preference
-  try {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches
-  } catch {}
-  return false
+  return 'system'
 }
 
-// Module-level singleton so state is shared across all callers
-const isDark = ref(false) // initialised properly in initDark()
+function resolveIsDark(mode: DarkMode): boolean {
+  if (mode === 'dark')   return true
+  if (mode === 'light')  return false
+  if (mode === 'adaptive') {
+    const h = new Date().getHours()
+    return h < 6 || h >= 20          // dark 8 pm – 6 am
+  }
+  // system
+  try { return window.matchMedia('(prefers-color-scheme: dark)').matches } catch {}
+  return false
+}
 
 function applyDark(dark: boolean) {
   document.documentElement.classList.toggle('dark', dark)
 }
 
-watch(isDark, (dark) => {
-  applyDark(dark)
-  try { localStorage.setItem(STORAGE_KEY, String(dark)) } catch {}
+const mode   = ref<DarkMode>('system')
+const isDark = ref(false)
+
+// re-evaluate every minute so adaptive mode updates at the threshold
+let adaptiveTimer = 0
+
+function startAdaptiveTimer() {
+  clearInterval(adaptiveTimer)
+  adaptiveTimer = window.setInterval(() => {
+    if (mode.value === 'adaptive') {
+      const next = resolveIsDark('adaptive')
+      if (next !== isDark.value) {
+        isDark.value = next
+        applyDark(next)
+      }
+    }
+  }, 60_000)
+}
+
+watch(mode, (m) => {
+  isDark.value = resolveIsDark(m)
+  applyDark(isDark.value)
+  try { localStorage.setItem(STORAGE_KEY, m) } catch {}
 })
+
+// Listen to OS changes for 'system' mode
+let mqlCleanup: (() => void) | null = null
+watch(mode, (m) => {
+  mqlCleanup?.()
+  mqlCleanup = null
+  if (m === 'system') {
+    try {
+      const mql = window.matchMedia('(prefers-color-scheme: dark)')
+      const handler = (e: MediaQueryListEvent) => {
+        isDark.value = e.matches
+        applyDark(e.matches)
+      }
+      mql.addEventListener('change', handler)
+      mqlCleanup = () => mql.removeEventListener('change', handler)
+    } catch {}
+  }
+}, { immediate: true })
 
 export function useDark() {
   function initDark() {
-    const dark = readPersistedDark()
-    isDark.value = dark
-    // Apply immediately (before Vue's watch fires) to avoid flash
-    applyDark(dark)
+    mode.value   = readMode()
+    isDark.value = resolveIsDark(mode.value)
+    applyDark(isDark.value)
+    startAdaptiveTimer()
   }
 
+  function setMode(m: DarkMode) {
+    mode.value = m
+  }
+
+  // Legacy toggle (light ↔ dark) kept for any code that calls it
   function toggleDark() {
-    isDark.value = !isDark.value
+    setMode(isDark.value ? 'light' : 'dark')
   }
 
-  return { isDark, toggleDark, initDark }
+  return { isDark, mode, setMode, toggleDark, initDark }
 }

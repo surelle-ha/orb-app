@@ -37,10 +37,28 @@
             <p v-if="currentStepData.hint" class="text-[13px] text-zinc-600 font-medium mt-2">{{ currentStepData.hint }}</p>
           </div>
 
-          <!-- Input area -->
+          <!-- ── Name input ── -->
+          <div v-if="currentStepData.type === 'name'">
+            <div :class="['flex items-center gap-3 bg-zinc-900 border rounded-2xl px-5 py-4 transition-colors',
+              answers.user_name ? 'border-violet-500' : 'border-zinc-800']">
+              <User :size="18" class="text-zinc-600 flex-shrink-0" :stroke-width="1.8" />
+              <input
+                v-model="answers.user_name"
+                type="text"
+                placeholder="Enter your name…"
+                maxlength="32"
+                @keydown.enter="canProceed && next()"
+                class="flex-1 bg-transparent text-[22px] font-black text-white placeholder:text-zinc-700 outline-none tracking-tight"
+              />
+            </div>
+            <!-- Name preview -->
+            <p v-if="answers.user_name" class="text-[13px] text-zinc-500 mt-3 font-medium">
+              Nice to meet you, <span class="text-violet-400 font-bold">{{ answers.user_name }}</span> ✦
+            </p>
+          </div>
 
-          <!-- Single choice grid -->
-          <div v-if="currentStepData.type === 'choice'" class="grid grid-cols-2 gap-2.5">
+          <!-- ── Single choice grid ── -->
+          <div v-else-if="currentStepData.type === 'choice'" class="grid grid-cols-2 gap-2.5">
             <button v-for="opt in currentStepData.options" :key="opt.value"
               @click="selectChoice(opt.value)"
               :class="['flex flex-col items-start gap-2 p-4 rounded-2xl border transition-all active:scale-[0.97]',
@@ -52,7 +70,31 @@
             </button>
           </div>
 
-          <!-- Multi choice -->
+          <!-- ── Currency (scrollable list) ── -->
+          <div v-else-if="currentStepData.type === 'currency'"
+            class="flex flex-col gap-2 overflow-y-auto"
+            style="max-height:340px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;">
+            <button v-for="cur in CURRENCIES" :key="cur.code"
+              @click="selectCurrency(cur)"
+              :class="['flex items-center gap-3 p-4 rounded-2xl border transition-all active:scale-[0.98] flex-shrink-0',
+                answers.currency === cur.code
+                  ? 'bg-violet-500/10 border-violet-500'
+                  : 'bg-zinc-900 border-zinc-800']">
+              <span class="text-[20px] font-black text-zinc-400 w-8 text-center flex-shrink-0">{{ cur.symbol }}</span>
+              <div class="flex-1 text-left">
+                <p :class="['text-[14px] font-bold', answers.currency === cur.code ? 'text-violet-300' : 'text-zinc-300']">
+                  {{ cur.label }}
+                </p>
+                <p class="text-[11px] text-zinc-600">{{ cur.code }}</p>
+              </div>
+              <div v-if="answers.currency === cur.code"
+                class="w-5 h-5 rounded-full bg-violet-500 flex items-center justify-center flex-shrink-0">
+                <Check :size="11" color="white" :stroke-width="3" />
+              </div>
+            </button>
+          </div>
+
+          <!-- ── Multi choice ── -->
           <div v-else-if="currentStepData.type === 'multi'" class="flex flex-col gap-2">
             <button v-for="opt in currentStepData.options" :key="opt.value"
               @click="toggleMulti(currentStepData.key, opt.value)"
@@ -74,14 +116,14 @@
             </button>
           </div>
 
-          <!-- Number input -->
+          <!-- ── Number input ── -->
           <div v-else-if="currentStepData.type === 'number'">
             <div :class="['flex items-center gap-3 bg-zinc-900 border rounded-2xl px-5 py-4 transition-colors',
               answers[currentStepData.key] ? 'border-violet-500' : 'border-zinc-800']">
               <span v-if="currentStepData.prefix" class="text-[20px] font-black text-violet-400">{{ currentStepData.prefix }}</span>
               <input
                 v-model="answers[currentStepData.key]"
-                :type="'number'"
+                type="number"
                 :placeholder="currentStepData.placeholder || '0'"
                 class="flex-1 bg-transparent text-[32px] font-black text-white placeholder:text-zinc-700 outline-none tracking-tight"
               />
@@ -89,21 +131,16 @@
             </div>
           </div>
 
-          <!-- Slider -->
+          <!-- ── Slider ── -->
           <div v-else-if="currentStepData.type === 'slider'" class="flex flex-col gap-4">
             <div class="flex justify-between items-center">
               <span class="text-[13px] font-semibold text-zinc-600">{{ currentStepData.labels[0] }}</span>
               <span class="text-[20px] font-black text-violet-300">{{ sliderLabel }}</span>
               <span class="text-[13px] font-semibold text-zinc-600">{{ currentStepData.labels[1] }}</span>
             </div>
-            <input
-              type="range"
-              :min="currentStepData.min"
-              :max="currentStepData.max"
-              :step="currentStepData.step || 1"
-              v-model="answers[currentStepData.key]"
-              class="slider w-full accent-violet-500 h-1.5"
-            />
+            <input type="range" :min="currentStepData.min" :max="currentStepData.max"
+              :step="currentStepData.step || 1" v-model="answers[currentStepData.key]"
+              class="slider w-full accent-violet-500 h-1.5" />
             <div class="grid grid-cols-3 gap-1.5 mt-1">
               <button v-for="preset in currentStepData.presets" :key="preset.value"
                 @click="answers[currentStepData.key] = preset.value"
@@ -136,22 +173,41 @@
 <script setup>
 import { ref, computed, reactive } from 'vue'
 import {
-  User, DollarSign, Target, TrendingUp, CreditCard,
-  Briefcase, PiggyBank, ShieldCheck, Check, Sparkles,
-  BarChart2, Clock
+  User, DollarSign, Target, TrendingUp,
+  Briefcase, PiggyBank, BarChart2, Globe, Check,
 } from 'lucide-vue-next'
+import { CURRENCIES, saveSettings } from '../composables/useStore'
+
+// Lazy-load DB functions — won't exist on web, gracefully ignored
+let _setProfile = async (k, v) => {}
+let _markDone   = async ()     => {}
+import('../composables/useDatabase')
+  .then(db => { _setProfile = db.setProfile; _markDone = db.markOnboardingDone })
+  .catch(() => {})
 
 const emit = defineEmits(['done'])
 
-// ─── STEPS ───────────────────────────────────────────────
+// ── Steps ─────────────────────────────────────────────────
 const steps = [
+  // 1. Name — always first
   {
-    key:      'age_range',
-    type:     'choice',
-    category: 'About You',
-    icon:     User,
-    question: 'How old are you?',
-    hint:     'Helps personalize advice for your life stage.',
+    key: 'user_name', type: 'name', category: 'Welcome',
+    icon: User,
+    question: "What's your name?",
+    hint: 'This is how Orb will greet you.',
+  },
+  // 2. Currency
+  {
+    key: 'currency', type: 'currency', category: 'Setup',
+    icon: Globe,
+    question: 'Your currency?',
+    hint: 'All amounts will display in this currency.',
+  },
+  // 3. Age
+  {
+    key: 'age_range', type: 'choice', category: 'About You',
+    icon: User, question: 'How old are you?',
+    hint: 'Helps personalise advice for your life stage.',
     options: [
       { value:'18-24', label:'18–24', emoji:'🌱' },
       { value:'25-34', label:'25–34', emoji:'🚀' },
@@ -159,97 +215,63 @@ const steps = [
       { value:'45+',   label:'45+',   emoji:'🏆' },
     ],
   },
+  // 4. Employment
   {
-    key:      'employment',
-    type:     'choice',
-    category: 'Income',
-    icon:     Briefcase,
-    question: 'What\'s your work situation?',
-    hint:     'We\'ll adjust cash flow tracking accordingly.',
+    key: 'employment', type: 'choice', category: 'Income',
+    icon: Briefcase, question: "What's your work situation?",
+    hint: "We'll adjust cash flow tracking accordingly.",
     options: [
-      { value:'employed',   label:'Employed',    emoji:'🏢' },
-      { value:'freelance',  label:'Freelance',   emoji:'💻' },
-      { value:'business',   label:'Business',    emoji:'🏪' },
-      { value:'student',    label:'Student',     emoji:'🎓' },
+      { value:'employed',  label:'Employed',  emoji:'🏢' },
+      { value:'freelance', label:'Freelance',  emoji:'💻' },
+      { value:'business',  label:'Business',  emoji:'🏪' },
+      { value:'student',   label:'Student',   emoji:'🎓' },
     ],
   },
+  // 5. Monthly income
   {
-    key:         'monthly_income',
-    type:        'number',
-    category:    'Income',
-    icon:        DollarSign,
-    question:    'Monthly income?',
-    hint:        'Approximate is fine. Used to set realistic budget limits.',
-    prefix:      '₱',
-    placeholder: '0',
-    suffix:      '/ month',
+    key: 'monthly_income', type: 'number', category: 'Income',
+    icon: DollarSign, question: 'Monthly income?',
+    hint: 'Approximate is fine.',
+    prefix: '~', placeholder: '0', suffix: '/ month',
   },
+  // 6. Goals
   {
-    key:      'financial_goals',
-    type:     'multi',
-    category: 'Goals',
-    icon:     Target,
-    question: 'What are you working toward?',
-    hint:     'Pick all that apply.',
+    key: 'financial_goals', type: 'multi', category: 'Goals',
+    icon: Target, question: 'What are you working toward?',
+    hint: 'Pick all that apply.',
     options: [
-      { value:'emergency_fund',  label:'Build emergency fund'    },
-      { value:'debt_payoff',     label:'Pay off debt'            },
-      { value:'savings',         label:'Grow savings'            },
-      { value:'investment',      label:'Start investing'         },
-      { value:'big_purchase',    label:'Save for big purchase'   },
-      { value:'retirement',      label:'Plan for retirement'     },
+      { value:'emergency_fund', label:'Build emergency fund' },
+      { value:'debt_payoff',    label:'Pay off debt'         },
+      { value:'savings',        label:'Grow savings'         },
+      { value:'investment',     label:'Start investing'      },
+      { value:'big_purchase',   label:'Save for big purchase'},
+      { value:'retirement',     label:'Plan for retirement'  },
     ],
   },
+  // 7. Challenge
   {
-    key:      'biggest_challenge',
-    type:     'choice',
-    category: 'Habits',
-    icon:     BarChart2,
-    question: 'Biggest money challenge?',
+    key: 'biggest_challenge', type: 'choice', category: 'Habits',
+    icon: BarChart2, question: 'Biggest money challenge?',
     options: [
-      { value:'overspending',  label:'Overspending',     emoji:'💸' },
-      { value:'no_budget',     label:'No budget plan',   emoji:'📊' },
-      { value:'impulse',       label:'Impulse buying',   emoji:'🛒' },
-      { value:'debt',          label:'Managing debt',    emoji:'📉' },
+      { value:'overspending', label:'Overspending',   emoji:'💸' },
+      { value:'no_budget',    label:'No budget plan', emoji:'📊' },
+      { value:'impulse',      label:'Impulse buying', emoji:'🛒' },
+      { value:'debt',         label:'Managing debt',  emoji:'📉' },
     ],
   },
+  // 8. Savings rate
   {
-    key:      'savings_rate',
-    type:     'slider',
-    category: 'Savings',
-    icon:     PiggyBank,
-    question: 'Current savings rate?',
-    hint:     'What % of income do you save each month?',
-    min:      0,
-    max:      60,
-    step:     5,
-    labels:   ['0%','60%'],
-    presets:  [
-      { value:0,  label:'None yet'  },
-      { value:10, label:'10%'       },
-      { value:20, label:'20%'       },
-    ],
+    key: 'savings_rate', type: 'slider', category: 'Savings',
+    icon: PiggyBank, question: 'Current savings rate?',
+    hint: 'What % of income do you save each month?',
+    min: 0, max: 60, step: 5, labels: ['0%','60%'],
+    presets: [{ value:0, label:'None yet' }, { value:10, label:'10%' }, { value:20, label:'20%' }],
   },
+  // 9. Risk tolerance
   {
-    key:      'credit_cards',
-    type:     'choice',
-    category: 'Debt',
-    icon:     CreditCard,
-    question: 'Do you carry credit card balances?',
-    options: [
-      { value:'never',      label:'Never carry', emoji:'✅' },
-      { value:'sometimes',  label:'Sometimes',   emoji:'⚠️' },
-      { value:'always',     label:'Always',      emoji:'🔴' },
-      { value:'none',       label:'No cards',    emoji:'🚫' },
-    ],
-  },
-  {
-    key:      'risk_tolerance',
-    type:     'choice',
-    category: 'Investing',
-    icon:     TrendingUp,
-    question: 'Investment comfort level?',
-    hint:     'Affects savings goal and tip recommendations.',
+    key: 'risk_tolerance', type: 'choice', category: 'Investing',
+    icon: TrendingUp, question: 'Investment comfort level?',
+    hint: 'Affects savings goal recommendations.',
     options: [
       { value:'conservative', label:'Conservative', emoji:'🏦' },
       { value:'moderate',     label:'Moderate',     emoji:'⚖️' },
@@ -259,40 +281,42 @@ const steps = [
   },
 ]
 
-// ─── STATE ────────────────────────────────────────────────
-const currentStep  = ref(1)
+// ── State ─────────────────────────────────────────────────
+const currentStep    = ref(1)
 const stepTransition = ref('step-forward')
-const answers      = reactive({})
+const answers        = reactive({ user_name: '', currency: 'USD' })
 
-// Initialize slider defaults
-steps.forEach(s => {
-  if (s.type === 'slider') answers[s.key] = s.min
-})
+steps.forEach(s => { if (s.type === 'slider') answers[s.key] = s.min })
 
 const currentStepData = computed(() => steps[currentStep.value - 1])
 const isLast          = computed(() => currentStep.value === steps.length)
 
 const canProceed = computed(() => {
-  const key = currentStepData.value.key
-  const val = answers[key]
-  if (currentStepData.value.type === 'multi')   return (val?.length ?? 0) > 0
-  if (currentStepData.value.type === 'number')  return val && parseFloat(val) >= 0
-  if (currentStepData.value.type === 'slider')  return true
+  const s = currentStepData.value
+  if (s.type === 'name')     return answers.user_name.trim().length >= 1
+  if (s.type === 'currency') return !!answers.currency
+  const val = answers[s.key]
+  if (s.type === 'multi')    return (val?.length ?? 0) > 0
+  if (s.type === 'number')   return val !== undefined && val !== '' && parseFloat(val) >= 0
+  if (s.type === 'slider')   return true
   return !!val
 })
 
 const sliderLabel = computed(() => {
   const s = currentStepData.value
   if (s.type !== 'slider') return ''
-  const val = answers[s.key] ?? s.min
-  return val + '%'
+  return (answers[s.key] ?? s.min) + '%'
 })
 
-// ─── ACTIONS ─────────────────────────────────────────────
+// ── Actions ───────────────────────────────────────────────
 function selectChoice(value) {
   answers[currentStepData.value.key] = value
-  // Auto-advance on choice select after brief pause
   setTimeout(() => { if (canProceed.value) next() }, 320)
+}
+
+function selectCurrency(cur) {
+  answers.currency = cur.code
+  setTimeout(() => next(), 320)
 }
 
 function toggleMulti(key, value) {
@@ -304,56 +328,46 @@ function toggleMulti(key, value) {
 
 async function next() {
   if (!canProceed.value) return
-
-  if (isLast.value) {
-    await saveAndFinish()
-    return
-  }
-
+  if (isLast.value) { await saveAndFinish(); return }
   stepTransition.value = 'step-forward'
   currentStep.value++
 }
 
-async function skipAll() {
-  await saveAndFinish()
-}
+async function skipAll() { await saveAndFinish() }
 
 async function saveAndFinish() {
-  // Persist all answers to SQLite
+  const chosen = CURRENCIES.find(c => c.code === answers.currency) ?? CURRENCIES[0]
+  const name   = answers.user_name.trim()
+
+  // Persist to settings (available immediately across the whole app)
+  saveSettings({
+    currency:       chosen.code,
+    currencySymbol: chosen.symbol,
+    userName:       name,
+  })
+
+  // Also persist everything to SQLite profile
   for (const [key, value] of Object.entries(answers)) {
     const str = Array.isArray(value) ? value.join(',') : String(value)
-    await setProfile(key, str).catch(() => {})
+    await _setProfile(key, str).catch(() => {})
   }
-  await markOnboardingDone().catch(() => {})
-  emit('done', answers)
+  await _markDone().catch(() => {})
+  emit('done', { ...answers })
 }
 </script>
 
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap');
+.font-nunito { font-family:'Nunito',sans-serif; }
 
-.font-nunito { font-family: 'Nunito', sans-serif; }
+.step-forward-enter-active { transition:all 0.35s cubic-bezier(0.34,1.1,0.64,1); }
+.step-forward-leave-active { transition:all 0.25s ease; }
+.step-forward-enter-from   { opacity:0; transform:translateX(40px); }
+.step-forward-leave-to     { opacity:0; transform:translateX(-30px); }
 
-/* Step transition */
-.step-forward-enter-active { transition: all 0.35s cubic-bezier(0.34,1.1,0.64,1); }
-.step-forward-leave-active { transition: all 0.25s ease; }
-.step-forward-enter-from   { opacity: 0; transform: translateX(40px); }
-.step-forward-leave-to     { opacity: 0; transform: translateX(-30px); }
-
-/* Slider track */
-.slider {
-  -webkit-appearance: none;
-  appearance: none;
-  background: #27272a;
-  border-radius: 99px;
-  cursor: pointer;
-}
+.slider { -webkit-appearance:none; appearance:none; background:#27272a; border-radius:99px; cursor:pointer; }
 .slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 22px; height: 22px;
-  border-radius: 50%;
-  background: #8b5cf6;
-  box-shadow: 0 0 0 4px rgba(139,92,246,0.2);
-  cursor: pointer;
+  -webkit-appearance:none; width:22px; height:22px; border-radius:50%;
+  background:#8b5cf6; box-shadow:0 0 0 4px rgba(139,92,246,0.2); cursor:pointer;
 }
 </style>

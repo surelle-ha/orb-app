@@ -1,106 +1,420 @@
 // composables/useStore.ts
-// All reactive app data lives here — import in any page that needs it.
 
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import {
   ShoppingBag, Car, Banknote, Utensils, Zap,
   Smartphone, Gamepad2, Wifi, Building2, Tv2,
-  Plane, Shield, Laptop, BarChart2,
+  Plane, Shield, Laptop, BarChart2, MoreHorizontal, ShoppingCart,
 } from 'lucide-vue-next'
 
-// ─── TRANSACTIONS ─────────────────────────────────────────
-export const recentTx = ref([
-  { id:1, icon:ShoppingBag, name:'SM Supermarket', date:'Today',  amount:-1240, category:'Groceries' },
-  { id:2, icon:Car,         name:'Grab',           date:'Today',  amount:-180,  category:'Transport' },
-  { id:3, icon:Banknote,    name:'Salary Deposit', date:'Mar 15', amount:45000, category:'Income'    },
-  { id:4, icon:Utensils,    name:'Jollibee',       date:'Mar 14', amount:-320,  category:'Food'      },
-  { id:5, icon:Zap,         name:'Meralco Bill',   date:'Mar 13', amount:-2100, category:'Utilities' },
-  { id:6, icon:Smartphone,  name:'Globe Postpaid', date:'Mar 12', amount:-999,  category:'Utilities' },
-  { id:7, icon:Gamepad2,    name:'Steam Purchase', date:'Mar 10', amount:-750,  category:'Leisure'   },
-])
+// ── Keys ──────────────────────────────────────────────────
+export const TXNS_KEY     = 'orb_transactions_v1'
+export const CARDS_KEY    = 'orb_cards_v1'
+export const SETTINGS_KEY = 'orb_settings_v1'
+export const BILLS_KEY    = 'orb_bills_v1'
 
-export function addTx(tx: {
-  name: string; amount: number; category: string; icon?: any
-}) {
-  recentTx.value.unshift({
-    id:       Date.now(),
-    icon:     tx.icon ?? (tx.amount > 0 ? Banknote : ShoppingBag),
-    name:     tx.name,
-    date:     'Just now',
-    amount:   tx.amount,
-    category: tx.category,
-  })
+// ── App-wide logger ────────────────────────────────────────
+export interface LogEntry { ts: string; level: 'info'|'warn'|'error'; msg: string }
+const MAX_LOGS = 200
+export const appLogs = ref<LogEntry[]>([])
+
+export function orbLog(msg: string, level: 'info'|'warn'|'error' = 'info') {
+  const ts = new Date().toISOString().slice(11, 23)
+  appLogs.value.unshift({ ts, level, msg })
+  if (appLogs.value.length > MAX_LOGS) appLogs.value.length = MAX_LOGS
+  if (level === 'error') console.error(`[Orb] ${msg}`)
+  else if (level === 'warn') console.warn(`[Orb] ${msg}`)
+  else console.log(`[Orb] ${msg}`)
 }
 
-// ─── CREDIT CARDS ─────────────────────────────────────────
-export const activeCard = ref(0)
+// ── Settings ───────────────────────────────────────────────
+export interface Settings {
+  currency:         string
+  currencySymbol:   string
+  shakeToAdd:       boolean
+  idleLockEnabled:  boolean
+  idleLockMinutes:  number   // 1–60
+  accentColor:      string   // CSS hex
+  userName:         string
+}
+const DEFAULT_SETTINGS: Settings = {
+  currency:'USD', currencySymbol:'$', shakeToAdd:true,
+  idleLockEnabled:false, idleLockMinutes:5,
+  accentColor: '#8b5cf6',
+  userName: '',
+}
 
-export const creditCards = [
-  { id:1, bank:'BDO',       network:'VISA', number:'•••• •••• •••• 4812', holder:'Harold S.', expiry:'09/27', gradient:'linear-gradient(135deg,#1e1b4b,#3730a3)' },
-  { id:2, bank:'BPI',       network:'MC',   number:'•••• •••• •••• 3371', holder:'Harold S.', expiry:'12/26', gradient:'linear-gradient(135deg,#1a1a2e,#16213e)' },
-  { id:3, bank:'Metrobank', network:'VISA', number:'•••• •••• •••• 9204', holder:'Harold S.', expiry:'06/28', gradient:'linear-gradient(135deg,#0f2027,#203a43)' },
+function loadSettings(): Settings {
+  try { const r = localStorage.getItem(SETTINGS_KEY); if (r) return { ...DEFAULT_SETTINGS, ...JSON.parse(r) } } catch {}
+  return { ...DEFAULT_SETTINGS }
+}
+export const settings = ref<Settings>(loadSettings())
+
+// Persist to localStorage on every change
+watch(settings, v => {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(v)) } catch {}
+}, { deep:true })
+
+export function saveSettings(patch: Partial<Settings>) {
+  settings.value = { ...settings.value, ...patch }
+  orbLog(`Settings updated: ${JSON.stringify(patch)}`)
+}
+
+export const ACCENT_COLORS = [
+  { label:'Violet',  hex:'#8b5cf6' },
+  { label:'Purple',  hex:'#a855f7' },
+  { label:'Indigo',  hex:'#6366f1' },
+  { label:'Blue',    hex:'#3b82f6' },
+  { label:'Cyan',    hex:'#06b6d4' },
+  { label:'Teal',    hex:'#14b8a6' },
+  { label:'Emerald', hex:'#10b981' },
+  { label:'Rose',    hex:'#f43f5e' },
+  { label:'Pink',    hex:'#ec4899' },
+  { label:'Amber',   hex:'#f59e0b' },
+  { label:'Orange',  hex:'#f97316' },
+  { label:'Red',     hex:'#ef4444' },
 ]
 
-export const cardDetails: Record<number, { limit: number; outstanding: number; due: string }> = {
-  0: { limit:50000,  outstanding:18500, due:'Apr 5'  },
-  1: { limit:80000,  outstanding:32000, due:'Apr 10' },
-  2: { limit:120000, outstanding:5400,  due:'Apr 18' },
+export const CURRENCIES = [
+  { code:'USD', symbol:'$',  label:'US Dollar'         },
+  { code:'PHP', symbol:'₱',  label:'Philippine Peso'  },
+  { code:'EUR', symbol:'€',  label:'Euro'              },
+  { code:'GBP', symbol:'£',  label:'British Pound'     },
+  { code:'JPY', symbol:'¥',  label:'Japanese Yen'      },
+  { code:'SGD', symbol:'S$', label:'Singapore Dollar'  },
+  { code:'AUD', symbol:'A$', label:'Australian Dollar' },
+  { code:'CAD', symbol:'C$', label:'Canadian Dollar'   },
+  { code:'KRW', symbol:'₩',  label:'Korean Won'        },
+  { code:'CNY', symbol:'¥',  label:'Chinese Yuan'      },
+]
+
+// ── Icon map ───────────────────────────────────────────────
+export const CATEGORY_ICONS: Record<string, any> = {
+  Food:Utensils, Groceries:ShoppingBag, Transport:Car,
+  Utilities:Zap, Shopping:ShoppingCart, Leisure:Gamepad2,
+  Income:Banknote, Other:MoreHorizontal,
+}
+function iconForCategory(cat: string, amount: number) {
+  if (amount > 0) return Banknote
+  return CATEGORY_ICONS[cat] ?? MoreHorizontal
 }
 
-export const selectedCard = computed(() => ({
-  ...creditCards[activeCard.value],
-  ...cardDetails[activeCard.value],
-}))
+// ── Transaction ────────────────────────────────────────────
+export interface Tx {
+  id:        number
+  name:      string
+  amount:    number
+  category:  string
+  accountId: number | null
+  date:      string
+  isoDate:   string
+}
 
-// ─── GROCERY ──────────────────────────────────────────────
-export const activeList = ref('Weekly Essentials')
+function formatDate(iso: string): string {
+  const d = new Date(iso), now = new Date()
+  const diff = Math.floor((now.getTime() - d.getTime()) / 86400000)
+  if (diff === 0) return 'Today'
+  if (diff === 1) return 'Yesterday'
+  return d.toLocaleDateString('en-PH', { month:'short', day:'numeric' })
+}
 
-export const groceryLists = ref([
-  {
-    name: 'Weekly Essentials',
-    items: [
-      { name:'Rice (5kg)',       qty:'1 bag',    price:280, checked:false },
-      { name:'Eggs (1 tray)',    qty:'1 tray',   price:180, checked:true  },
-      { name:'Chicken breast',   qty:'1 kg',     price:220, checked:false },
-      { name:'Mixed Vegetables', qty:'assorted', price:150, checked:false },
-      { name:'Fresh Milk 1L',    qty:'2 pcs',    price:160, checked:true  },
-      { name:'Cooking Oil',      qty:'1L',       price:85,  checked:false },
-    ],
-  },
-  {
-    name: 'Monthly Stock',
-    items: [
-      { name:'Detergent',  qty:'2 packs', price:240, checked:false },
-      { name:'Shampoo',    qty:'1 btl',   price:180, checked:false },
-      { name:'Toothpaste', qty:'3 tubes', price:120, checked:false },
-    ],
-  },
-])
+function loadTxns(): Tx[] {
+  try { const r = localStorage.getItem(TXNS_KEY); if (r) return JSON.parse(r) } catch {}
+  return []
+}
+function saveTxns(list: Tx[]) {
+  try { localStorage.setItem(TXNS_KEY, JSON.stringify(list)) } catch {}
+}
 
-export const currentGroceryItems = computed(() =>
-  groceryLists.value.find(l => l.name === activeList.value)?.items ?? []
+export const transactions = ref<Tx[]>(loadTxns())
+
+export const recentTx = computed(() =>
+  [...transactions.value]
+    .sort((a, b) => new Date(b.isoDate).getTime() - new Date(a.isoDate).getTime())
+    .map(t => ({ ...t, icon: iconForCategory(t.category, t.amount) }))
 )
 
+export function addTx(tx: { name:string; amount:number; category:string; accountId?:number|null }) {
+  const iso = new Date().toISOString()
+  const entry: Tx = {
+    id: Date.now(), name: tx.name, amount: tx.amount,
+    category: tx.category, accountId: tx.accountId ?? null,
+    date: formatDate(iso), isoDate: iso,
+  }
+  transactions.value.unshift(entry)
+  saveTxns(transactions.value)
+  orbLog(`TX added: ${tx.name} ${tx.amount > 0 ? '+' : ''}${tx.amount}`)
+  if (tx.accountId != null) updateCardDisplayBalance(tx.accountId, tx.amount)
+}
+
+export const cardsVersion = ref(0)
+
+export function updateCardDisplayBalance(cardId: number, amount: number) {
+  try {
+    const raw = localStorage.getItem(CARDS_KEY)
+    if (!raw) return
+    const cards = JSON.parse(raw) as any[]
+    const card = cards.find((c: any) => c.id === cardId)
+    if (!card) return
+    if (card.type === 'credit') {
+      card.outstanding = Math.max(0, (card.outstanding ?? 0) - amount)
+    } else {
+      card.balance = Math.max(0, (card.balance ?? 0) + amount)
+      if (amount < 0) card.spent = (card.spent ?? 0) + Math.abs(amount)
+    }
+    localStorage.setItem(CARDS_KEY, JSON.stringify(cards))
+    cardsVersion.value++
+  } catch (e: any) { orbLog(`Card update failed: ${e?.message}`, 'error') }
+}
+
+// ── Totals ─────────────────────────────────────────────────
+export const totalIncome = computed(() =>
+  transactions.value.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0)
+)
+export const totalExpenses = computed(() =>
+  transactions.value.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
+)
+export const totalBalance = computed(() =>
+  transactions.value.reduce((s, t) => s + t.amount, 0)
+)
+
+// ── Spending by category (real, computed from transactions) ─
+export interface SpendCat { category: string; total: number }
+
+export const spendingByCategory = computed((): SpendCat[] => {
+  const map = new Map<string, number>()
+  transactions.value
+    .filter(t => t.amount < 0)
+    .forEach(t => {
+      const prev = map.get(t.category) ?? 0
+      map.set(t.category, prev + Math.abs(t.amount))
+    })
+  return Array.from(map.entries())
+    .map(([category, total]) => ({ category, total }))
+    .sort((a, b) => b.total - a.total)
+})
+
+// ── Bills ──────────────────────────────────────────────────
+export interface Bill {
+  id:        number
+  name:      string
+  amount:    number
+  dueDay:    number    // day of month 1-31
+  status:    'pending' | 'paid' | 'overdue'
+  icon:      string    // icon key
+  recurring: boolean   // auto-resets to pending next month when paid
+}
+
+const ICON_KEY_MAP: Record<string, any> = {
+  zap: Zap, smartphone: Smartphone, wifi: Wifi,
+  building2: Building2, tv2: Tv2, creditcard: MoreHorizontal, other: MoreHorizontal,
+}
+export function billIcon(key: string) { return ICON_KEY_MAP[key] ?? MoreHorizontal }
+
+function dueDateStatus(dueDay: number): 'pending'|'overdue' {
+  const today = new Date().getDate()
+  return today > dueDay ? 'overdue' : 'pending'
+}
+
+function loadBills(): Bill[] {
+  try {
+    const r = localStorage.getItem(BILLS_KEY)
+    if (r) return JSON.parse(r)
+  } catch {}
+  return []   // no seed data — user adds their own bills
+}
+function saveBillsRaw(list: Bill[]) {
+  try { localStorage.setItem(BILLS_KEY, JSON.stringify(list)) } catch {}
+}
+
+export const bills = ref<Bill[]>(loadBills())
+
+export function saveBills() {
+  saveBillsRaw(bills.value)
+  orbLog(`Bills saved (${bills.value.length} items)`)
+}
+
+export function addBill(bill: Omit<Bill, 'id'|'status'>): void {
+  const entry: Bill = { ...bill, id: Date.now(), status: dueDateStatus(bill.dueDay) }
+  bills.value.push(entry)
+  saveBills()
+  orbLog(`Bill added: ${bill.name}${bill.recurring ? ' (recurring)' : ''}`)
+}
+
+export function markBillPaid(id: number): void {
+  const b = bills.value.find(b => b.id === id)
+  if (!b) return
+  b.status = 'paid'
+  // Recurring bills: schedule reset to pending on next month's due day
+  if (b.recurring) {
+    orbLog(`Bill paid (recurring — resets next month): ${b.name}`)
+  } else {
+    orbLog(`Bill paid: ${b.name}`)
+  }
+  saveBills()
+}
+
+export function deleteBill(id: number): void {
+  const b = bills.value.find(b => b.id === id)
+  bills.value = bills.value.filter(b => b.id !== id)
+  saveBills()
+  orbLog(`Bill deleted: ${b?.name}`)
+}
+
+export function refreshBillStatuses(): void {
+  const today = new Date().getDate()
+  bills.value.forEach(b => {
+    if (b.status !== 'paid') b.status = today > b.dueDay ? 'overdue' : 'pending'
+  })
+  saveBills()
+}
+
+// Total bills due (unpaid)
+export const totalBillsDue = computed(() =>
+  bills.value.filter(b => b.status !== 'paid').reduce((s, b) => s + b.amount, 0)
+)
+export const overdueBillsCount = computed(() =>
+  bills.value.filter(b => b.status === 'overdue').length
+)
+
+// ── Goals ──────────────────────────────────────────────────
+export const goals = ref([
+  { icon:Plane,     label:'Japan',     pct:68, saved:34000, target:50000  },
+  { icon:Shield,    label:'Emergency', pct:45, saved:45000, target:100000 },
+  { icon:Laptop,    label:'Laptop',    pct:82, saved:41000, target:50000  },
+  { icon:BarChart2, label:'Invest',    pct:30, saved:15000, target:50000  },
+])
+
+// ── Grocery ────────────────────────────────────────────────
+export const GROCERY_KEY   = 'orb_grocery_lists_v1'
+export const GROCERY_BUDGET_KEY = 'orb_grocery_budget_v1'
+
+export interface GroceryItem {
+  id:        number
+  name:      string
+  qty:       string
+  price:     number
+  checked:   boolean
+  category:  string
+}
+
+export interface GroceryList {
+  id:        number
+  name:      string
+  budget:    number    // 0 = no budget
+  items:     GroceryItem[]
+  createdAt: string
+}
+
+function loadGroceryLists(): GroceryList[] {
+  try {
+    const r = localStorage.getItem(GROCERY_KEY)
+    if (r) return JSON.parse(r)
+  } catch {}
+  return []
+}
+function saveGroceryListsRaw(lists: GroceryList[]) {
+  try { localStorage.setItem(GROCERY_KEY, JSON.stringify(lists)) } catch {}
+}
+
+export const groceryLists   = ref<GroceryList[]>(loadGroceryLists())
+export const activeListId   = ref<number | null>(groceryLists.value[0]?.id ?? null)
+
+export const activeGroceryList = computed(() =>
+  groceryLists.value.find(l => l.id === activeListId.value) ?? null
+)
+export const currentGroceryItems = computed(() =>
+  activeGroceryList.value?.items ?? []
+)
 export const groceryTotal = computed(() =>
   currentGroceryItems.value.reduce((s, i) => s + i.price, 0)
 )
+export const groceryCheckedTotal = computed(() =>
+  currentGroceryItems.value.filter(i => i.checked).reduce((s, i) => s + i.price, 0)
+)
 
-// ─── BILLS ────────────────────────────────────────────────
-export const bills = ref([
-  { icon:Zap,       name:'Meralco',       due:'Mar 25', amount:2100,  status:'pending' },
-  { icon:Smartphone,name:'Globe Postpaid',due:'Mar 28', amount:999,   status:'pending' },
-  { icon:Wifi,      name:'Converge',      due:'Apr 1',  amount:1500,  status:'pending' },
-  { icon:Building2, name:'Rent',          due:'Apr 5',  amount:14000, status:'paid'    },
-  { icon:Tv2,       name:'Netflix',       due:'Mar 12', amount:549,   status:'overdue' },
-])
+function saveGroceryLists() {
+  saveGroceryListsRaw(groceryLists.value)
+}
 
-// ─── GOALS ────────────────────────────────────────────────
-export const goals = ref([
-  { icon:Plane,    label:'Japan',     pct:68, saved:34000, target:50000  },
-  { icon:Shield,   label:'Emergency', pct:45, saved:45000, target:100000 },
-  { icon:Laptop,   label:'Laptop',    pct:82, saved:41000, target:50000  },
-  { icon:BarChart2,label:'Invest',    pct:30, saved:15000, target:50000  },
-])
+export function addGroceryList(name: string, budget = 0): GroceryList {
+  const list: GroceryList = {
+    id: Date.now(), name: name.trim(), budget,
+    items: [], createdAt: new Date().toISOString(),
+  }
+  groceryLists.value.push(list)
+  saveGroceryLists()
+  activeListId.value = list.id
+  orbLog(`Grocery list created: ${name}`)
+  return list
+}
 
-// ─── QUICK ADD SHEET ──────────────────────────────────────
+export function deleteGroceryList(id: number) {
+  const name = groceryLists.value.find(l => l.id === id)?.name
+  groceryLists.value = groceryLists.value.filter(l => l.id !== id)
+  if (activeListId.value === id) {
+    activeListId.value = groceryLists.value[0]?.id ?? null
+  }
+  saveGroceryLists()
+  orbLog(`Grocery list deleted: ${name}`)
+}
+
+export function renameGroceryList(id: number, name: string) {
+  const list = groceryLists.value.find(l => l.id === id)
+  if (!list) return
+  list.name = name.trim()
+  saveGroceryLists()
+}
+
+export function setListBudget(id: number, budget: number) {
+  const list = groceryLists.value.find(l => l.id === id)
+  if (!list) return
+  list.budget = budget
+  saveGroceryLists()
+  orbLog(`Grocery budget set: ${budget} for ${list.name}`)
+}
+
+export function addGroceryItem(listId: number, item: Omit<GroceryItem, 'id'|'checked'>) {
+  const list = groceryLists.value.find(l => l.id === listId)
+  if (!list) return
+  list.items.push({ ...item, id: Date.now(), checked: false })
+  saveGroceryLists()
+  orbLog(`Grocery item added: ${item.name}`)
+}
+
+export function toggleGroceryItem(listId: number, itemId: number) {
+  const list = groceryLists.value.find(l => l.id === listId)
+  if (!list) return
+  const item = list.items.find(i => i.id === itemId)
+  if (!item) return
+  item.checked = !item.checked
+  saveGroceryLists()
+}
+
+export function deleteGroceryItem(listId: number, itemId: number) {
+  const list = groceryLists.value.find(l => l.id === listId)
+  if (!list) return
+  list.items = list.items.filter(i => i.id !== itemId)
+  saveGroceryLists()
+  orbLog(`Grocery item deleted`)
+}
+
+export function clearCheckedItems(listId: number) {
+  const list = groceryLists.value.find(l => l.id === listId)
+  if (!list) return
+  const removed = list.items.filter(i => i.checked).length
+  list.items = list.items.filter(i => !i.checked)
+  saveGroceryLists()
+  orbLog(`Cleared ${removed} checked items from ${list.name}`)
+}
+
+export const GROCERY_CATEGORIES = [
+  'Produce', 'Meat & Seafood', 'Dairy & Eggs', 'Bakery',
+  'Pantry', 'Frozen', 'Beverages', 'Snacks',
+  'Household', 'Personal Care', 'Other',
+]
+
+// ── Quick Add Sheet ────────────────────────────────────────
 export const quickAddOpen = ref(false)
+
+orbLog('Store initialised')

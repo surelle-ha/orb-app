@@ -1,343 +1,318 @@
 <template>
-  <div class="bg-slate-100 dark:bg-zinc-950">
+  <div class="bg-slate-100 dark:bg-zinc-950 pb-28" style="touch-action:pan-y;">
 
-    <!-- Header -->
-    <div class="flex items-center justify-between px-5 pt-6 pb-4">
-      <h2 class="text-2xl font-black text-slate-900 dark:text-zinc-50 tracking-tight">My Cards</h2>
-      <button
-        @click="showAddCard = true"
-        class="flex items-center gap-1.5 bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-[13px] font-bold px-4 py-2.5 rounded-full active:scale-95 transition-transform shadow-sm"
+    <!-- Toast -->
+    <Transition name="toast">
+      <div v-if="toastMsg"
+        class="fixed left-1/2 -translate-x-1/2 z-[999] flex items-center gap-2.5 px-5 py-3.5 rounded-2xl shadow-xl"
+        :style="{ top:'calc(16px + env(safe-area-inset-top))', background: toastType==='success'?'linear-gradient(135deg,#4c1d95,#6d28d9)':'#dc2626', maxWidth:'360px', width:'calc(100vw - 32px)' }"
       >
-        <Plus :size="14" :stroke-width="2.5" /> Add Card
-      </button>
-    </div>
-
-    <!-- ── Single swipeable card ── -->
-    <div class="px-5">
-      <!-- Empty state -->
-      <div v-if="cards.length === 0"
-        class="h-[190px] rounded-3xl border-2 border-dashed border-slate-300 dark:border-zinc-700 flex flex-col items-center justify-center gap-2"
-      >
-        <CreditCard :size="28" class="text-slate-300 dark:text-zinc-700" :stroke-width="1.5" />
-        <p class="text-[13px] font-bold text-slate-400 dark:text-zinc-600">No cards yet. Tap Add Card.</p>
-      </div>
-
-      <!-- Card -->
-      <div
-        v-else
-        class="relative h-[190px] rounded-3xl overflow-hidden select-none touch-pan-y"
-        :style="{ background: currentCard.gradient, boxShadow: '0 20px 50px rgba(0,0,0,0.28)' }"
-        @touchstart="onTouchStart"
-        @touchmove.prevent="onTouchMove"
-        @touchend="onTouchEnd"
-        @mousedown="onMouseDown"
-      >
-        <!-- Noise texture -->
-        <div class="absolute inset-0 opacity-[0.05] pointer-events-none"
-          style="background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22200%22><filter id=%22n%22><feTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%224%22/></filter><rect width=%22200%22 height=%22200%22 filter=%22url(%23n)%22 opacity=%221%22/></svg>')">
+        <div class="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+          <Check v-if="toastType==='success'" :size="13" color="white" :stroke-width="3" />
+          <X     v-else                       :size="13" color="white" :stroke-width="3" />
         </div>
-
-        <!-- Slide transition layer -->
-        <Transition :name="slideDir">
-          <div :key="activeCard" class="absolute inset-0 p-5 flex flex-col justify-between">
-
-            <!-- Top row -->
-            <div class="flex justify-between items-start">
-              <div>
-                <span class="text-[10px] font-bold uppercase tracking-widest text-white/40">
-                  {{ cardTypeLabel(currentCard.type) }}
-                </span>
-                <p class="text-base font-black text-white/90 mt-0.5">{{ currentCard.bank }}</p>
-              </div>
-              <div class="flex items-center gap-2">
-                <!-- NFC button -->
-                <button
-                  @click.stop="handleNfcTap(currentCard)"
-                  class="relative w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-90"
-                  :class="currentCard.nfcEnabled ? 'bg-white/15 active:bg-white/25' : 'bg-white/5'"
-                >
-                  <Wifi
-                    :size="17"
-                    :color="currentCard.nfcEnabled ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.25)'"
-                    :stroke-width="2"
-                    style="transform: rotate(90deg)"
-                  />
-                  <!-- Strike-through when NFC disabled -->
-                  <div v-if="!currentCard.nfcEnabled"
-                    class="absolute inset-0 flex items-center justify-center pointer-events-none"
-                  >
-                    <div class="w-[20px] h-[1.5px] bg-white/50 rounded-full" style="transform: rotate(-45deg)"></div>
-                  </div>
-                </button>
-                <span class="text-[12px] font-black text-white/40 tracking-wide">{{ currentCard.network }}</span>
-              </div>
-            </div>
-
-            <!-- Card number -->
-            <div class="text-[15px] font-mono tracking-[0.18em] text-white/70">
-              {{ currentCard.number }}
-            </div>
-
-            <!-- Bottom row -->
-            <div class="flex items-end gap-4">
-              <div>
-                <div class="text-[9px] text-white/30 uppercase tracking-widest">Card Holder</div>
-                <div class="text-[12px] font-bold text-white/80 mt-0.5">{{ currentCard.holder }}</div>
-              </div>
-              <div v-if="currentCard.expiry">
-                <div class="text-[9px] text-white/30 uppercase tracking-widest">Expires</div>
-                <div class="text-[12px] font-bold text-white/80 mt-0.5">{{ currentCard.expiry }}</div>
-              </div>
-              <!-- Swipe hint -->
-              <div v-if="cards.length > 1 && showSwipeHint"
-                class="ml-auto flex items-center gap-1 text-white/30 text-[10px] font-semibold pointer-events-none"
-              >
-                <ChevronLeft :size="11" /> swipe <ChevronRight :size="11" />
-              </div>
-            </div>
-
-          </div>
-        </Transition>
-      </div>
-    </div>
-
-    <!-- Pip indicators -->
-    <div v-if="cards.length > 1" class="flex justify-center gap-1.5 mt-3 mb-1">
-      <button v-for="(_, i) in cards" :key="i" @click="goTo(i)"
-        :class="['h-1.5 rounded-full transition-all duration-300',
-          activeCard === i ? 'w-5 bg-violet-500' : 'w-1.5 bg-slate-300 dark:bg-zinc-700']"
-      />
-    </div>
-
-    <!-- NFC / info banner -->
-    <Transition name="fade">
-      <div v-if="nfcBanner"
-        :class="['mx-4 mt-3 rounded-2xl px-4 py-3 flex items-center gap-3 text-[13px] font-semibold border',
-          nfcBanner.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' :
-          nfcBanner.type === 'error'   ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-500 border-rose-200 dark:border-rose-800' :
-                                         'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800']"
-      >
-        <component :is="nfcBanner.icon" :size="18" :stroke-width="2" class="flex-shrink-0" />
-        <span class="flex-1 leading-snug">{{ nfcBanner.msg }}</span>
+        <p class="text-white text-[13px] font-bold flex-1">{{ toastMsg }}</p>
       </div>
     </Transition>
 
-    <!-- Card Stats -->
-    <div v-if="cards.length > 0 && currentCard" class="grid grid-cols-2 gap-2.5 mx-4 mt-3">
-      <div class="rounded-2xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm p-4">
-        <p class="text-[11px] font-semibold text-slate-400 dark:text-zinc-500 mb-1.5">
-          {{ currentCard.type === 'credit' ? 'Credit Limit' : 'Balance' }}
-        </p>
-        <p class="text-[19px] font-black text-slate-800 dark:text-zinc-100 tracking-tight">
-          ₱{{ (currentCard.type === 'credit' ? currentCard.limit ?? 0 : currentCard.balance ?? 0).toLocaleString() }}
+    <!-- Header -->
+    <div class="flex items-center justify-between px-5 pt-6 pb-4">
+      <h2 class="text-2xl font-black text-slate-900 dark:text-zinc-50 tracking-tight">Accounts</h2>
+      <button @click="showAddSheet = true"
+        class="flex items-center gap-1.5 bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-[13px] font-bold px-4 py-2.5 rounded-full active:scale-95 transition-transform shadow-sm">
+        <Plus :size="14" :stroke-width="2.5" /> Add Account
+      </button>
+    </div>
+
+    <!-- Account type filter chips -->
+    <div class="flex gap-2 px-4 overflow-x-auto scrollbar-hide pb-3">
+      <button v-for="f in typeFilters" :key="f.val"
+        @click="activeFilter = f.val"
+        :class="['flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold border transition-all',
+          activeFilter === f.val
+            ? 'bg-violet-500 border-violet-500 text-white shadow-lg shadow-violet-500/25'
+            : 'bg-white/70 dark:bg-zinc-900/60 backdrop-blur border-slate-200/60 dark:border-zinc-800/60 text-slate-500 dark:text-zinc-400']">
+        <component :is="f.icon" :size="11" :stroke-width="2.5" />
+        {{ f.label }}
+      </button>
+    </div>
+
+    <!-- Net worth summary bar -->
+    <div v-if="accounts.length > 0"
+      class="mx-4 mb-4 rounded-2xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm px-4 py-3 flex items-center justify-between">
+      <div>
+        <p class="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Net Worth</p>
+        <p :class="['text-[22px] font-black tracking-tight mt-0.5', netWorth >= 0 ? 'text-slate-900 dark:text-zinc-50' : 'text-rose-500']">
+          {{ sym }}{{ formatAmount(Math.abs(netWorth)) }}
         </p>
       </div>
-
-      <div class="rounded-2xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm p-4">
-        <p class="text-[11px] font-semibold text-slate-400 dark:text-zinc-500 mb-1.5">
-          {{ currentCard.type === 'credit' ? 'Outstanding' : 'Spent this month' }}
-        </p>
-        <p :class="['text-[19px] font-black tracking-tight',
-          currentCard.type === 'credit' ? 'text-rose-500' : 'text-slate-800 dark:text-zinc-100']">
-          ₱{{ (currentCard.type === 'credit' ? currentCard.outstanding ?? 0 : currentCard.spent ?? 0).toLocaleString() }}
-        </p>
-      </div>
-
-      <!-- Credit utilization bar -->
-      <div v-if="currentCard.type === 'credit'"
-        class="col-span-2 rounded-2xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm p-4"
-      >
-        <div class="flex justify-between items-center mb-3">
-          <p class="text-[11px] font-semibold text-slate-400 dark:text-zinc-500">Utilization</p>
-          <p class="text-[15px] font-black text-slate-800 dark:text-zinc-100">
-            {{ Math.round((currentCard.outstanding ?? 0) / Math.max(currentCard.limit ?? 1, 1) * 100) }}%
-          </p>
+      <div class="text-right">
+        <p class="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">{{ filteredAccounts.length }} accounts</p>
+        <div class="flex gap-2 mt-1 justify-end">
+          <span class="text-[11px] font-bold text-emerald-500">↑ {{ sym }}{{ formatAmount(totalAssets) }}</span>
+          <span class="text-[11px] font-bold text-rose-400">↓ {{ sym }}{{ formatAmount(totalLiabilities) }}</span>
         </div>
-        <div class="h-2 bg-slate-100 dark:bg-zinc-800 rounded-full overflow-hidden mb-2.5">
-          <div class="h-full rounded-full bg-violet-500 transition-all duration-700"
-            :style="{ width: Math.min(100, Math.round((currentCard.outstanding ?? 0) / Math.max(currentCard.limit ?? 1, 1) * 100)) + '%' }">
+      </div>
+    </div>
+
+    <!-- Account list -->
+    <div v-if="filteredAccounts.length === 0"
+      class="mx-4 rounded-2xl border-2 border-dashed border-slate-300 dark:border-zinc-700 flex flex-col items-center justify-center gap-3 py-12">
+      <div class="w-12 h-12 rounded-2xl bg-violet-50 dark:bg-violet-950/40 flex items-center justify-center">
+        <Wallet :size="22" class="text-violet-400" :stroke-width="1.5" />
+      </div>
+      <div class="text-center">
+        <p class="text-[14px] font-bold text-slate-500 dark:text-zinc-500">No accounts yet</p>
+        <p class="text-[12px] text-slate-400 dark:text-zinc-600 mt-0.5">Tap Add Account to get started</p>
+      </div>
+    </div>
+
+    <!-- Grouped by category -->
+    <div v-for="group in groupedAccounts" :key="group.type" class="mb-2">
+      <div class="flex items-center gap-2 px-5 pb-2">
+        <component :is="accountTypeMeta(group.type).icon" :size="13" class="text-violet-500" :stroke-width="2.5" />
+        <h3 class="text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">{{ accountTypeMeta(group.type).label }}</h3>
+      </div>
+      <div class="mx-4 rounded-2xl overflow-hidden bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm">
+        <div v-for="(acc, i) in group.items" :key="acc.id"
+          @click="selectAccount(acc)"
+          :class="['flex items-center gap-3 px-4 py-3.5 cursor-pointer active:bg-slate-50 dark:active:bg-zinc-800/80 transition-colors',
+            i < group.items.length - 1 ? 'border-b border-slate-100 dark:border-zinc-800/60' : '']">
+          <!-- Color dot / icon -->
+          <div class="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0"
+            :style="{ background: acc.gradient }">
+            <component :is="accountTypeMeta(acc.type).icon" :size="18" color="rgba(255,255,255,0.85)" :stroke-width="2" />
           </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-[14px] font-bold text-slate-800 dark:text-zinc-100 truncate">{{ acc.name }}</p>
+            <p class="text-[11px] text-slate-400 dark:text-zinc-500 mt-0.5">
+              {{ acc.institution }}
+              <span v-if="acc.lastFour" class="font-mono"> ···{{ acc.lastFour }}</span>
+            </p>
+          </div>
+          <div class="text-right flex-shrink-0">
+            <p :class="['text-[15px] font-black', balanceColor(acc)]">
+              {{ sym }}{{ formatAmount(displayBalance(acc)) }}
+            </p>
+            <p v-if="acc.type === 'credit'" class="text-[10px] text-slate-400 dark:text-zinc-500 mt-0.5">
+              {{ sym }}{{ formatAmount((acc.limit ?? 0) - (acc.outstanding ?? 0)) }} avail
+            </p>
+            <p v-else class="text-[10px] text-slate-400 dark:text-zinc-500 mt-0.5 capitalize">{{ acc.type }}</p>
+          </div>
+          <ChevronRight :size="15" class="text-slate-300 dark:text-zinc-700 flex-shrink-0 ml-1" :stroke-width="2" />
         </div>
-        <div class="flex justify-between text-[11px] font-semibold text-slate-400 dark:text-zinc-500">
-          <span>Due {{ currentCard.due }}</span>
-          <span class="text-emerald-500">
-            ₱{{ ((currentCard.limit ?? 0) - (currentCard.outstanding ?? 0)).toLocaleString() }} available
+      </div>
+    </div>
+
+    <!-- Recent charges for selected account -->
+    <div v-if="selectedAcc" class="mt-4">
+      <div class="flex items-center justify-between px-5 pb-2">
+        <h3 class="text-[13px] font-bold text-slate-800 dark:text-zinc-200">{{ selectedAcc.name }} — Recent</h3>
+        <button @click="selectedAcc = null" class="text-[11px] font-bold text-violet-500 active:opacity-60">Dismiss</button>
+      </div>
+      <div class="mx-4 rounded-2xl overflow-hidden bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm">
+        <div v-if="accountTxns.length === 0" class="py-8 text-center">
+          <p class="text-[13px] font-bold text-slate-400 dark:text-zinc-600">No transactions for this account</p>
+        </div>
+        <div v-for="(tx, i) in accountTxns.slice(0, 5)" :key="tx.id"
+          :class="['flex items-center gap-3 px-4 py-3.5',
+            i < Math.min(4, accountTxns.length - 1) ? 'border-b border-slate-100 dark:border-zinc-800/60' : '']">
+          <div class="w-10 h-10 rounded-2xl bg-violet-50 dark:bg-violet-950/40 flex items-center justify-center flex-shrink-0">
+            <component :is="tx.icon" :size="17" class="text-violet-500" :stroke-width="1.8" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-[13px] font-bold text-slate-800 dark:text-zinc-100 truncate">{{ tx.name }}</p>
+            <p class="text-[10px] text-slate-400 dark:text-zinc-500 mt-0.5">{{ tx.category }} · {{ tx.date }}</p>
+          </div>
+          <span :class="['text-[13px] font-bold', tx.amount > 0 ? 'text-emerald-500' : 'text-slate-700 dark:text-zinc-300']">
+            {{ tx.amount > 0 ? '+' : '−' }}{{ sym }}{{ formatAmount(Math.abs(tx.amount)) }}
           </span>
         </div>
       </div>
+    </div>
 
-      <!-- Debit/Prepaid balance bar -->
-      <div v-else
-        class="col-span-2 rounded-2xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm p-4"
-      >
-        <div class="flex justify-between items-center mb-3">
-          <p class="text-[11px] font-semibold text-slate-400 dark:text-zinc-500">Monthly Usage</p>
-          <p class="text-[15px] font-black text-slate-800 dark:text-zinc-100">
-            ₱{{ (currentCard.spent ?? 0).toLocaleString() }}
-          </p>
-        </div>
-        <div class="h-2 bg-slate-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-          <div class="h-full rounded-full bg-violet-500 transition-all duration-700"
-            :style="{ width: Math.min(100, Math.round(((currentCard.spent ?? 0) / Math.max(currentCard.balance ?? 1, 1)) * 100)) + '%' }">
-          </div>
-        </div>
+    <!-- Credit utilization for selected credit account -->
+    <div v-if="selectedAcc && selectedAcc.type === 'credit'" class="mx-4 mt-3 rounded-2xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm p-4">
+      <div class="flex justify-between items-center mb-2">
+        <p class="text-[12px] font-bold text-slate-500 dark:text-zinc-400">Credit Utilization</p>
+        <p class="text-[15px] font-black text-slate-800 dark:text-zinc-100">{{ utilizationPct }}%</p>
       </div>
-    </div>
-
-    <!-- Recent Charges -->
-    <div class="flex items-center justify-between px-5 pt-5 pb-3">
-      <h3 class="text-[15px] font-bold text-slate-800 dark:text-zinc-200">Recent Charges</h3>
-    </div>
-    <div class="mx-4 rounded-2xl overflow-hidden bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm">
-      <div v-for="(tx, i) in expenses.slice(0, 4)" :key="tx.id"
-        :class="['flex items-center gap-3 px-4 py-3.5 transition-colors active:bg-slate-50 dark:active:bg-zinc-800',
-          i < Math.min(3, expenses.length - 1) ? 'border-b border-slate-100 dark:border-zinc-800/60' : '']"
-      >
-        <div class="w-11 h-11 rounded-2xl bg-violet-50 dark:bg-violet-950/40 flex items-center justify-center flex-shrink-0">
-          <component :is="tx.icon" :size="19" class="text-violet-500" :stroke-width="1.8" />
-        </div>
-        <div class="flex-1 min-w-0">
-          <p class="text-[14px] font-bold text-slate-800 dark:text-zinc-100 truncate">{{ tx.name }}</p>
-          <p class="text-[11px] text-slate-400 dark:text-zinc-500 font-medium mt-0.5">{{ tx.date }}</p>
-        </div>
-        <span class="text-[14px] font-bold text-slate-700 dark:text-zinc-300 flex-shrink-0">
-          −₱{{ Math.abs(tx.amount).toLocaleString() }}
+      <div class="h-2 bg-slate-100 dark:bg-zinc-800 rounded-full overflow-hidden mb-2">
+        <div :class="['h-full rounded-full transition-all duration-700',
+          utilizationPct > 70 ? 'bg-rose-500' : utilizationPct > 40 ? 'bg-amber-500' : 'bg-violet-500']"
+          :style="{ width: Math.min(100, utilizationPct) + '%' }"></div>
+      </div>
+      <div class="flex justify-between text-[11px] font-semibold text-slate-400 dark:text-zinc-500">
+        <span>Due {{ selectedAcc.due ?? '—' }}</span>
+        <span :class="utilizationPct > 70 ? 'text-rose-500' : 'text-emerald-500'">
+          {{ sym }}{{ formatAmount((selectedAcc.limit ?? 0) - (selectedAcc.outstanding ?? 0)) }} available
         </span>
       </div>
     </div>
 
-    <div class="h-6"></div>
+    <!-- Delete button for selected account -->
+    <div v-if="selectedAcc" class="flex justify-center mt-3">
+      <button @click="showDeleteConfirm = true"
+        class="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[12px] font-bold text-rose-400 active:opacity-60">
+        <Trash2 :size="13" :stroke-width="2" /> Remove account
+      </button>
+    </div>
+
+    <div class="h-4"></div>
   </div>
 
-  <!-- ── Modals via Teleport so they don't break page root ── -->
-
-  <!-- Add Card Sheet -->
+  <!-- ── Add Account Sheet ── -->
   <Teleport to="body">
     <Transition name="sheet">
-      <div v-if="showAddCard"
+      <div v-if="showAddSheet"
         class="fixed inset-0 z-[200] flex items-end justify-center"
         style="background:rgba(0,0,0,0.5);backdrop-filter:blur(8px)"
-        @click.self="showAddCard = false"
-      >
+        @click.self="showAddSheet = false">
         <div class="w-full max-w-[430px] bg-white dark:bg-zinc-900 rounded-t-[28px] border-t border-slate-200/60 dark:border-zinc-800"
-          :style="{ paddingBottom:'calc(32px + env(safe-area-inset-bottom))' }"
-        >
-          <div class="flex flex-col gap-3 px-5 pt-4 max-h-[88vh] overflow-y-auto pb-2">
+          :style="{ paddingBottom:'calc(32px + env(safe-area-inset-bottom))' }">
+          <div class="flex flex-col gap-3 px-5 pt-4 max-h-[90vh] overflow-y-auto pb-2">
 
-            <div class="w-10 h-1 bg-slate-200 dark:bg-zinc-700 rounded-full self-center mb-1 flex-shrink-0"></div>
-            <h3 class="text-[18px] font-black text-center text-slate-900 dark:text-zinc-50">Add Card</h3>
+            <div class="w-10 h-1 bg-slate-200 dark:bg-zinc-700 rounded-full self-center mb-1"></div>
+            <h3 class="text-[18px] font-black text-center text-slate-900 dark:text-zinc-50">Add Account</h3>
 
-            <!-- Type -->
-            <div class="flex bg-slate-100 dark:bg-zinc-800 rounded-2xl p-1 gap-1">
-              <button v-for="t in cardTypes" :key="t.val" @click="newCard.type = t.val"
-                :class="['flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[12px] font-bold transition-all',
-                  newCard.type === t.val ? 'bg-white dark:bg-zinc-700 text-slate-900 dark:text-zinc-50 shadow-sm' : 'text-slate-400 dark:text-zinc-600']"
-              >
-                <component :is="t.icon" :size="13" :stroke-width="2" />{{ t.label }}
+            <!-- Account type selector -->
+            <p class="text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest px-1">Account Type</p>
+            <div class="grid grid-cols-2 gap-2">
+              <button v-for="t in accountTypes" :key="t.val"
+                @click="newAcc.type = t.val"
+                :class="['flex items-center gap-3 p-3 rounded-2xl border-2 transition-all active:scale-[0.98]',
+                  newAcc.type === t.val
+                    ? 'border-violet-500 bg-violet-50 dark:bg-violet-950/40'
+                    : 'border-transparent bg-slate-50 dark:bg-zinc-800']">
+                <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                  :style="{ background: t.gradient }">
+                  <component :is="t.icon" :size="16" color="white" :stroke-width="2" />
+                </div>
+                <div class="text-left">
+                  <p :class="['text-[12px] font-black', newAcc.type===t.val?'text-violet-600 dark:text-violet-300':'text-slate-700 dark:text-zinc-300']">{{ t.label }}</p>
+                  <p class="text-[9px] text-slate-400 dark:text-zinc-500">{{ t.sub }}</p>
+                </div>
               </button>
             </div>
 
-            <input v-model="newCard.bank" placeholder="Bank / Issuer (e.g. BDO, GCash)"
+            <!-- Name -->
+            <input v-model="newAcc.name" placeholder="Account name (e.g. BDO Savings)"
               class="w-full bg-slate-50 dark:bg-zinc-800 rounded-2xl px-4 py-3.5 text-[15px] font-semibold text-slate-900 dark:text-zinc-50 placeholder:text-slate-300 dark:placeholder:text-zinc-600 border-2 border-transparent focus:border-violet-500 outline-none transition-colors" />
 
-            <input v-model="newCard.holder" placeholder="Card holder name"
+            <!-- Institution -->
+            <input v-model="newAcc.institution" placeholder="Bank / Broker / Institution"
               class="w-full bg-slate-50 dark:bg-zinc-800 rounded-2xl px-4 py-3.5 text-[15px] font-semibold text-slate-900 dark:text-zinc-50 placeholder:text-slate-300 dark:placeholder:text-zinc-600 border-2 border-transparent focus:border-violet-500 outline-none transition-colors" />
 
-            <input v-model="newCard.number" placeholder="Last 4 digits" maxlength="4" inputmode="numeric"
-              class="w-full bg-slate-50 dark:bg-zinc-800 rounded-2xl px-4 py-3.5 text-[15px] font-semibold text-slate-900 dark:text-zinc-50 placeholder:text-slate-300 dark:placeholder:text-zinc-600 border-2 border-transparent focus:border-violet-500 outline-none transition-colors" />
-
-            <!-- Network + Expiry -->
-            <div class="flex gap-2">
-              <div class="flex bg-slate-100 dark:bg-zinc-800 rounded-2xl p-1 gap-0.5 flex-1">
-                <button v-for="n in networks" :key="n" @click="newCard.network = n"
-                  :class="['flex-1 py-2 rounded-xl text-[11px] font-bold transition-all',
-                    newCard.network === n ? 'bg-white dark:bg-zinc-700 text-slate-900 dark:text-zinc-50 shadow-sm' : 'text-slate-400 dark:text-zinc-600']"
-                >{{ n }}</button>
-              </div>
-              <input v-if="newCard.type === 'credit' || newCard.type === 'debit'"
-                v-model="newCard.expiry" placeholder="MM/YY" maxlength="5"
+            <!-- Last 4 + network (cards only) -->
+            <div v-if="['credit','debit','prepaid','atm'].includes(newAcc.type)" class="flex gap-2">
+              <input v-model="newAcc.lastFour" placeholder="Last 4" maxlength="4" inputmode="numeric"
                 class="w-24 bg-slate-50 dark:bg-zinc-800 rounded-2xl px-3 py-3.5 text-[14px] font-semibold text-slate-900 dark:text-zinc-50 placeholder:text-slate-300 dark:placeholder:text-zinc-600 border-2 border-transparent focus:border-violet-500 outline-none transition-colors text-center" />
+              <div class="flex flex-1 bg-slate-100 dark:bg-zinc-800 rounded-2xl p-1 gap-0.5">
+                <button v-for="n in ['VISA','MC','JCB','Amex']" :key="n"
+                  @click="newAcc.network = n"
+                  :class="['flex-1 py-2 rounded-xl text-[11px] font-bold transition-all',
+                    newAcc.network===n?'bg-white dark:bg-zinc-700 text-slate-900 dark:text-zinc-50 shadow-sm':'text-slate-400 dark:text-zinc-600']">
+                  {{ n }}
+                </button>
+              </div>
             </div>
 
-            <!-- Amount -->
+            <!-- Balance / limit field -->
             <div class="flex items-center gap-3 bg-slate-50 dark:bg-zinc-800 rounded-2xl px-4 py-3.5 border-2 border-transparent focus-within:border-violet-500 transition-colors">
-              <span class="text-[20px] font-black text-violet-500">₱</span>
-              <input v-model="newCard.limitOrBalance" type="number"
-                :placeholder="newCard.type === 'credit' ? 'Credit limit' : 'Current balance'"
+              <span class="text-[20px] font-black text-violet-500">{{ sym }}</span>
+              <input v-model="newAcc.initialBalance" type="number"
+                :placeholder="newAcc.type === 'credit' ? 'Credit limit' : 'Current balance'"
                 class="flex-1 bg-transparent text-[20px] font-black text-slate-900 dark:text-zinc-50 placeholder:text-slate-300 dark:placeholder:text-zinc-700 outline-none" />
             </div>
 
-            <!-- NFC toggle -->
-            <button @click="newCard.nfcEnabled = !newCard.nfcEnabled"
-              :class="['flex items-center gap-3 p-4 rounded-2xl border-2 transition-all',
-                newCard.nfcEnabled ? 'bg-violet-500/10 border-violet-500' : 'bg-slate-50 dark:bg-zinc-800 border-transparent']"
-            >
-              <div :class="['w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0',
-                newCard.nfcEnabled ? 'bg-violet-500' : 'bg-slate-200 dark:bg-zinc-700']">
-                <Wifi :size="18" :color="newCard.nfcEnabled ? 'white' : '#94a3b8'" :stroke-width="2" style="transform:rotate(90deg)" />
-              </div>
-              <div class="flex-1 text-left">
-                <p :class="['text-[14px] font-bold', newCard.nfcEnabled ? 'text-violet-600 dark:text-violet-400' : 'text-slate-700 dark:text-zinc-300']">
-                  Enable NFC / Tap to Pay
-                </p>
-                <p class="text-[11px] text-slate-400 dark:text-zinc-500 mt-0.5">Opens Google Pay / Samsung Pay on tap</p>
-              </div>
-              <div :class="['w-12 h-6 rounded-full transition-all relative flex-shrink-0',
-                newCard.nfcEnabled ? 'bg-violet-500' : 'bg-slate-200 dark:bg-zinc-700']">
-                <div :class="['absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all',
-                  newCard.nfcEnabled ? 'left-6' : 'left-0.5']"></div>
-              </div>
-            </button>
+            <!-- Due date (credit only) -->
+            <input v-if="newAcc.type === 'credit'" v-model="newAcc.due" placeholder="Due date (e.g. 5th of month)"
+              class="w-full bg-slate-50 dark:bg-zinc-800 rounded-2xl px-4 py-3.5 text-[14px] font-semibold text-slate-900 dark:text-zinc-50 placeholder:text-slate-300 dark:placeholder:text-zinc-600 border-2 border-transparent focus:border-violet-500 outline-none transition-colors" />
 
-            <!-- Gradient picker -->
+            <!-- Color picker -->
             <div>
-              <p class="text-[12px] font-semibold text-slate-400 dark:text-zinc-500 mb-2 px-1">Card Color</p>
+              <p class="text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-2 px-1">Color</p>
               <div class="flex gap-2 flex-wrap">
-                <button v-for="(g, idx) in gradients" :key="idx" @click="newCard.gradientIdx = idx"
-                  :class="['w-10 h-10 rounded-xl transition-all active:scale-95',
-                    newCard.gradientIdx === idx ? 'ring-2 ring-offset-2 ring-violet-500 scale-110' : '']"
-                  :style="{ background: g }"
-                />
+                <button v-for="(g, idx) in gradients" :key="idx"
+                  @click="newAcc.gradientIdx = idx"
+                  :class="['w-9 h-9 rounded-xl transition-all active:scale-95', newAcc.gradientIdx===idx?'ring-2 ring-offset-2 ring-violet-500 scale-110':'']"
+                  :style="{ background: g }" />
               </div>
             </div>
 
-            <button @click="submitAddCard" :disabled="!canSubmit"
+            <!-- NFC toggle (card types) -->
+            <button v-if="['credit','debit','prepaid','atm'].includes(newAcc.type)"
+              @click="newAcc.nfcEnabled = !newAcc.nfcEnabled"
+              :class="['flex items-center gap-3 p-4 rounded-2xl border-2 transition-all',
+                newAcc.nfcEnabled?'bg-violet-500/10 border-violet-500':'bg-slate-50 dark:bg-zinc-800 border-transparent']">
+              <div :class="['w-9 h-9 rounded-xl flex items-center justify-center',
+                newAcc.nfcEnabled?'bg-violet-500':'bg-slate-200 dark:bg-zinc-700']">
+                <Wifi :size="16" :color="newAcc.nfcEnabled?'white':'#94a3b8'" :stroke-width="2" style="transform:rotate(90deg)" />
+              </div>
+              <div class="flex-1 text-left">
+                <p :class="['text-[13px] font-bold', newAcc.nfcEnabled?'text-violet-600 dark:text-violet-400':'text-slate-700 dark:text-zinc-300']">Enable NFC / Tap to Pay</p>
+              </div>
+              <div :class="['w-11 h-6 rounded-full transition-all relative', newAcc.nfcEnabled?'bg-violet-500':'bg-slate-200 dark:bg-zinc-700']">
+                <div :class="['absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all', newAcc.nfcEnabled?'left-5':'left-0.5']"></div>
+              </div>
+            </button>
+
+            <button @click="submitAdd" :disabled="!canSubmit"
               :class="['w-full py-4 rounded-2xl text-[16px] font-black active:scale-[0.98] transition-all mb-2',
-                canSubmit ? 'bg-violet-500 text-white shadow-lg shadow-violet-500/30' : 'bg-slate-100 dark:bg-zinc-800 text-slate-300 dark:text-zinc-600']"
-            >Add Card</button>
+                canSubmit?'bg-violet-500 text-white shadow-lg shadow-violet-500/30':'bg-slate-100 dark:bg-zinc-800 text-slate-300 dark:text-zinc-600']">
+              Add Account
+            </button>
           </div>
         </div>
       </div>
     </Transition>
   </Teleport>
 
-  <!-- NFC Pay Modal -->
+  <!-- ── Delete Confirmation ── -->
   <Teleport to="body">
     <Transition name="fade">
-      <div v-if="nfcModal"
-        class="fixed inset-0 z-[300] flex items-center justify-center"
-        style="background:rgba(0,0,0,0.78);backdrop-filter:blur(14px)"
-        @click.self="nfcModal = false"
-      >
+      <div v-if="showDeleteConfirm"
+        class="fixed inset-0 z-[300] flex items-end justify-center"
+        style="background:rgba(0,0,0,0.6);backdrop-filter:blur(12px)"
+        @click.self="showDeleteConfirm = false">
+        <div class="w-full max-w-[430px] bg-white dark:bg-zinc-900 rounded-t-[28px] border-t border-slate-200/60 dark:border-zinc-800 pb-10 px-5 pt-5">
+          <div class="w-10 h-1 bg-slate-200 dark:bg-zinc-700 rounded-full self-center mx-auto mb-5"></div>
+          <div v-if="selectedAcc" class="rounded-2xl p-4 mb-5 flex items-center gap-3" :style="{ background: selectedAcc.gradient }">
+            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+              <component :is="accountTypeMeta(selectedAcc.type).icon" :size="18" color="white" :stroke-width="2" />
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-white/50 uppercase">{{ accountTypeMeta(selectedAcc.type).label }}</p>
+              <p class="text-[17px] font-black text-white mt-0.5">{{ selectedAcc.name }}</p>
+              <p class="text-[12px] text-white/60">{{ selectedAcc.institution }}</p>
+            </div>
+          </div>
+          <p class="text-[16px] font-black text-slate-900 dark:text-zinc-50 text-center mb-1">Remove this account?</p>
+          <p class="text-[13px] text-slate-400 dark:text-zinc-500 text-center mb-6 leading-snug">This only removes it from Orb. Your actual account is unaffected.</p>
+          <button @click="confirmDelete" class="w-full py-4 rounded-2xl bg-rose-500 text-white text-[16px] font-black active:scale-[0.98] shadow-lg shadow-rose-500/30 mb-3">Yes, Remove</button>
+          <button @click="showDeleteConfirm = false" class="w-full py-3.5 rounded-2xl bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 text-[15px] font-bold active:scale-[0.98]">Cancel</button>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
+
+  <!-- ── NFC Modal ── -->
+  <Teleport to="body">
+    <Transition name="fade">
+      <div v-if="nfcModal" class="fixed inset-0 z-[300] flex items-center justify-center"
+        style="background:rgba(0,0,0,0.78);backdrop-filter:blur(14px)" @click.self="nfcModal = false">
         <div class="flex flex-col items-center gap-6 p-10 text-center max-w-[320px]">
           <div class="relative w-32 h-32 flex items-center justify-center">
             <div class="absolute inset-0 rounded-full bg-violet-500/20 animate-ping"></div>
-            <div class="absolute inset-4 rounded-full bg-violet-500/30 animate-ping" style="animation-delay:0.15s"></div>
             <div class="w-20 h-20 rounded-full bg-violet-500 flex items-center justify-center shadow-2xl shadow-violet-500/50">
               <Wifi :size="36" color="white" :stroke-width="1.8" style="transform:rotate(90deg)" />
             </div>
           </div>
           <div>
             <p class="text-white text-[20px] font-black">Tap to Pay</p>
-            <p class="text-white/50 text-[13px] font-medium mt-2 leading-relaxed">
-              Real NFC payment uses your bank's tokenized card via Google Pay or Samsung Pay.
-              Open your payment app and hold your phone near the terminal.
-            </p>
+            <p class="text-white/50 text-[13px] mt-2 leading-relaxed">Hold your phone near the payment terminal. Real NFC uses Google Pay or Samsung Pay.</p>
           </div>
-          <button @click="openPayApp"
-            class="w-full py-3.5 rounded-2xl bg-white text-zinc-900 text-[15px] font-black active:scale-95 transition-all shadow-lg"
-          >Open Payment App</button>
-          <button @click="nfcModal = false" class="text-white/40 text-[13px] font-semibold active:text-white/70">Cancel</button>
+          <button @click="nfcModal = false" class="text-white/40 text-[13px] font-semibold active:text-white/70">Dismiss</button>
         </div>
       </div>
     </Transition>
@@ -345,206 +320,241 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive } from 'vue'
+import { ref, computed, reactive, onMounted, watch } from 'vue'
 import {
-  Plus, Wifi, ChevronLeft, ChevronRight,
-  CreditCard, Landmark, Wallet, CheckCircle, XCircle, Info,
+  Plus, Wifi, ChevronRight, Check, X, Trash2,
+  CreditCard, Landmark, Wallet, PiggyBank,
+  TrendingUp, Building2, Coins, Banknote,
 } from 'lucide-vue-next'
-import { recentTx } from '../composables/useStore'
+import { recentTx, cardsVersion, settings, orbLog } from '../composables/useStore'
 
-interface Card {
+const CARDS_KEY = 'orb_cards_v1'
+const sym = computed(() => settings.value.currencySymbol)
+
+// ── Account interface ──────────────────────────────────────
+interface Account {
   id:           number
-  type:         'credit' | 'debit' | 'prepaid' | 'atm'
-  bank:         string
-  network:      string
-  number:       string
-  holder:       string
-  expiry?:      string
+  type:         'credit' | 'debit' | 'savings' | 'investment' | 'cash' | 'prepaid' | 'atm' | 'loan'
+  name:         string
+  institution:  string
+  lastFour?:    string
+  network?:     string
   gradient:     string
   nfcEnabled:   boolean
+  // credit fields
   limit?:       number
   outstanding?: number
   due?:         string
+  // asset fields (debit, savings, investment, cash, prepaid, atm)
   balance?:     number
   spent?:       number
+  // loan
+  principal?:   number
+  remaining?:   number
 }
 
-const cards = ref<Card[]>([
-  { id:1, type:'credit',  bank:'BDO',       network:'VISA', number:'•••• •••• •••• 4812', holder:'Harold S.', expiry:'09/27', gradient:'linear-gradient(135deg,#1e1b4b,#3730a3)', nfcEnabled:true,  limit:50000,  outstanding:18500, due:'Apr 5'  },
-  { id:2, type:'credit',  bank:'BPI',       network:'MC',   number:'•••• •••• •••• 3371', holder:'Harold S.', expiry:'12/26', gradient:'linear-gradient(135deg,#1a1a2e,#16213e)', nfcEnabled:false, limit:80000,  outstanding:32000, due:'Apr 10' },
-  { id:3, type:'debit',   bank:'UnionBank', network:'VISA', number:'•••• •••• •••• 9204', holder:'Harold S.', gradient:'linear-gradient(135deg,#0f2027,#203a43)',                nfcEnabled:true,  balance:24000, spent:8400  },
-  { id:4, type:'prepaid', bank:'GCash',     network:'MC',   number:'•••• •••• •••• 0011', holder:'Harold S.', gradient:'linear-gradient(135deg,#065f46,#059669)',                nfcEnabled:false, balance:1500,  spent:500   },
-])
-
-const activeCard  = ref(0)
-const currentCard = computed(() => cards.value[activeCard.value])
-const expenses    = computed(() => recentTx.value.filter(t => t.amount < 0))
-
-function cardTypeLabel(type: string) {
-  const m: Record<string,string> = { credit:'Credit Card', debit:'Debit Card', prepaid:'Prepaid', atm:'ATM Card' }
-  return m[type] ?? type
+// ── Account type metadata ──────────────────────────────────
+const ACCOUNT_META: Record<string, { label: string; icon: any; gradient: string; sub: string }> = {
+  credit:     { label:'Credit Card',  icon:CreditCard, gradient:'linear-gradient(135deg,#1e1b4b,#3730a3)', sub:'Revolving credit line'  },
+  debit:      { label:'Debit Card',   icon:CreditCard, gradient:'linear-gradient(135deg,#0f2027,#203a43)', sub:'Linked to bank account' },
+  savings:    { label:'Savings',      icon:PiggyBank,  gradient:'linear-gradient(135deg,#065f46,#059669)', sub:'High-yield or regular'   },
+  investment: { label:'Investment',   icon:TrendingUp, gradient:'linear-gradient(135deg,#1c1917,#7c2d12)', sub:'Stocks, funds, crypto'  },
+  cash:       { label:'Cash',         icon:Banknote,   gradient:'linear-gradient(135deg,#14532d,#16a34a)', sub:'Physical cash on hand'  },
+  prepaid:    { label:'Prepaid',      icon:Wallet,     gradient:'linear-gradient(135deg,#4a044e,#86198f)', sub:'Loaded prepaid card'    },
+  atm:        { label:'ATM / Passbook',icon:Landmark,  gradient:'linear-gradient(135deg,#1e3a5f,#1d4ed8)', sub:'Traditional bank book'  },
+  loan:       { label:'Loan / Debt',  icon:Building2,  gradient:'linear-gradient(135deg,#7f1d1d,#dc2626)', sub:'Track what you owe'     },
 }
 
-// ── Swipe ────────────────────────────────────────────────
-let touchStartX   = 0
-let touchStartY   = 0
-const slideDir      = ref('card-left')
-const showSwipeHint = ref(true)
-
-function onTouchStart(e: TouchEvent) {
-  touchStartX = e.touches[0].clientX
-  touchStartY = e.touches[0].clientY
-}
-function onTouchMove(e: TouchEvent) {
-  const dx = Math.abs(e.touches[0].clientX - touchStartX)
-  const dy = Math.abs(e.touches[0].clientY - touchStartY)
-  if (dx > dy) e.preventDefault()
-}
-function onTouchEnd(e: TouchEvent) {
-  const dx = e.changedTouches[0].clientX - touchStartX
-  if (dx < -50 && activeCard.value < cards.value.length - 1) {
-    slideDir.value = 'card-left'; activeCard.value++
-  } else if (dx > 50 && activeCard.value > 0) {
-    slideDir.value = 'card-right'; activeCard.value--
-  }
-  showSwipeHint.value = false
-}
-function onMouseDown(e: MouseEvent) {
-  const startX = e.clientX
-  const onUp = (ev: MouseEvent) => {
-    const dx = ev.clientX - startX
-    if (Math.abs(dx) > 50) {
-      if (dx < 0 && activeCard.value < cards.value.length - 1) {
-        slideDir.value = 'card-left'; activeCard.value++
-      } else if (dx > 0 && activeCard.value > 0) {
-        slideDir.value = 'card-right'; activeCard.value--
-      }
-    }
-    window.removeEventListener('mouseup', onUp)
-  }
-  window.addEventListener('mouseup', onUp)
-}
-function goTo(i: number) {
-  slideDir.value = i > activeCard.value ? 'card-left' : 'card-right'
-  activeCard.value = i
+function accountTypeMeta(type: string) {
+  return ACCOUNT_META[type] ?? ACCOUNT_META.debit
 }
 
-// ── NFC ─────────────────────────────────────────────────
-const nfcModal = ref(false)
-interface Banner { type: 'success'|'error'|'info'; msg: string; icon: any }
-const nfcBanner = ref<Banner | null>(null)
-let bannerTimer: ReturnType<typeof setTimeout> | null = null
+const accountTypes = Object.entries(ACCOUNT_META).map(([val, m]) => ({ val, ...m }))
 
-function showBanner(type: Banner['type'], msg: string) {
-  if (bannerTimer) clearTimeout(bannerTimer)
-  nfcBanner.value = { type, msg, icon: type === 'success' ? CheckCircle : type === 'error' ? XCircle : Info }
-  bannerTimer = setTimeout(() => { nfcBanner.value = null }, 5000)
-}
-
-function handleNfcTap(card: Card) {
-  if (!card.nfcEnabled) {
-    showBanner('info', 'NFC is not enabled for this card. Edit the card to enable Tap to Pay.')
-    return
-  }
-  const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream
-  if (isIos) {
-    showBanner('error', 'NFC payments on iOS require Apple Pay and cannot be accessed from this app.')
-    return
-  }
-  const hasNfc = 'NDEFReader' in window
-  if (!hasNfc) {
-    showBanner('info', 'Cannot confirm NFC support on this device. Opening payment app…')
-    setTimeout(openPayApp, 1200)
-    return
-  }
-  nfcModal.value = true
-}
-
-function openPayApp() {
-  nfcModal.value = false
-  window.location.href = 'googlepay://'
-  setTimeout(() => { window.location.href = 'samsungpay://' }, 1200)
-}
-
-// ── Add Card ─────────────────────────────────────────────
-const showAddCard = ref(false)
-
+// ── Gradients palette ──────────────────────────────────────
 const gradients = [
-  'linear-gradient(135deg,#1e1b4b,#3730a3)',
-  'linear-gradient(135deg,#1a1a2e,#16213e)',
-  'linear-gradient(135deg,#0f2027,#203a43)',
-  'linear-gradient(135deg,#065f46,#059669)',
-  'linear-gradient(135deg,#7c2d12,#c2410c)',
-  'linear-gradient(135deg,#4a044e,#86198f)',
-  'linear-gradient(135deg,#0c4a6e,#0284c7)',
-  'linear-gradient(135deg,#1c1917,#44403c)',
-  'linear-gradient(135deg,#134e4a,#0891b2)',
+  'linear-gradient(135deg,#1e1b4b,#3730a3)', 'linear-gradient(135deg,#1a1a2e,#16213e)',
+  'linear-gradient(135deg,#0f2027,#203a43)', 'linear-gradient(135deg,#065f46,#059669)',
+  'linear-gradient(135deg,#7c2d12,#c2410c)', 'linear-gradient(135deg,#4a044e,#86198f)',
+  'linear-gradient(135deg,#0c4a6e,#0284c7)', 'linear-gradient(135deg,#1c1917,#44403c)',
+  'linear-gradient(135deg,#134e4a,#0891b2)', 'linear-gradient(135deg,#14532d,#16a34a)',
+  'linear-gradient(135deg,#1e3a5f,#1d4ed8)', 'linear-gradient(135deg,#7f1d1d,#dc2626)',
 ]
 
-const cardTypes = [
-  { val:'credit',  label:'Credit',  icon: CreditCard },
-  { val:'debit',   label:'Debit',   icon: Landmark   },
-  { val:'prepaid', label:'Prepaid', icon: Wallet      },
-  { val:'atm',     label:'ATM',     icon: Landmark    },
+// ── Load / save ────────────────────────────────────────────
+function loadAccounts(): Account[] {
+  try { const r = localStorage.getItem(CARDS_KEY); if (r) return JSON.parse(r) } catch {}
+  return []
+}
+function saveAccounts(list: Account[]) {
+  try { localStorage.setItem(CARDS_KEY, JSON.stringify(list)) } catch {}
+}
+
+const accounts = ref<Account[]>(loadAccounts())
+onMounted(() => { accounts.value = loadAccounts() })
+watch(cardsVersion, () => { accounts.value = loadAccounts() })
+
+// ── Filters ────────────────────────────────────────────────
+const typeFilters = [
+  { val:'all',        label:'All',         icon:Wallet      },
+  { val:'credit',     label:'Credit',      icon:CreditCard  },
+  { val:'debit',      label:'Debit',       icon:Landmark    },
+  { val:'savings',    label:'Savings',     icon:PiggyBank   },
+  { val:'investment', label:'Investment',  icon:TrendingUp  },
+  { val:'loan',       label:'Loans',       icon:Building2   },
 ]
-const networks = ['VISA', 'MC', 'JCB', 'Amex']
+const activeFilter = ref('all')
 
-const newCard = reactive({
-  type: 'credit' as Card['type'],
-  bank: '', number: '', holder: '', expiry: '',
-  network: 'VISA', limitOrBalance: '',
-  nfcEnabled: false, gradientIdx: 0,
-})
-
-const canSubmit = computed(() =>
-  newCard.bank.trim().length > 0 && newCard.number.trim().length > 0 && newCard.holder.trim().length > 0
+const filteredAccounts = computed(() =>
+  activeFilter.value === 'all' ? accounts.value : accounts.value.filter(a => a.type === activeFilter.value)
 )
 
-function submitAddCard() {
+// Group by type
+const groupedAccounts = computed(() => {
+  const map = new Map<string, Account[]>()
+  for (const acc of filteredAccounts.value) {
+    if (!map.has(acc.type)) map.set(acc.type, [])
+    map.get(acc.type)!.push(acc)
+  }
+  return Array.from(map.entries()).map(([type, items]) => ({ type, items }))
+})
+
+// ── Totals ─────────────────────────────────────────────────
+function displayBalance(acc: Account): number {
+  if (acc.type === 'credit') return -(acc.outstanding ?? 0)   // liability
+  if (acc.type === 'loan')   return -(acc.remaining ?? acc.principal ?? 0)
+  return acc.balance ?? 0
+}
+
+function balanceColor(acc: Account): string {
+  const b = displayBalance(acc)
+  if (b < 0) return 'text-rose-500'
+  if (acc.type === 'investment') return 'text-amber-500'
+  return 'text-slate-800 dark:text-zinc-100'
+}
+
+const totalAssets = computed(() =>
+  accounts.value.filter(a => !['credit','loan'].includes(a.type))
+    .reduce((s, a) => s + (a.balance ?? 0), 0)
+)
+const totalLiabilities = computed(() =>
+  accounts.value.filter(a => a.type === 'credit').reduce((s, a) => s + (a.outstanding ?? 0), 0) +
+  accounts.value.filter(a => a.type === 'loan').reduce((s, a) => s + (a.remaining ?? a.principal ?? 0), 0)
+)
+const netWorth = computed(() => totalAssets.value - totalLiabilities.value)
+
+// ── Selected account ───────────────────────────────────────
+const selectedAcc = ref<Account | null>(null)
+
+function selectAccount(acc: Account) {
+  selectedAcc.value = selectedAcc.value?.id === acc.id ? null : acc
+}
+
+const accountTxns = computed(() =>
+  selectedAcc.value
+    ? recentTx.value.filter(t => t.accountId === selectedAcc.value!.id)
+    : []
+)
+
+const utilizationPct = computed(() => {
+  if (!selectedAcc.value || selectedAcc.value.type !== 'credit') return 0
+  const limit = selectedAcc.value.limit ?? 1
+  return Math.round(((selectedAcc.value.outstanding ?? 0) / limit) * 100)
+})
+
+// ── NFC ────────────────────────────────────────────────────
+const nfcModal = ref(false)
+
+// ── Toast ──────────────────────────────────────────────────
+const toastMsg  = ref('')
+const toastType = ref<'success'|'error'>('success')
+let   toastTimer: ReturnType<typeof setTimeout> | null = null
+function showToast(msg: string, type: 'success'|'error' = 'success') {
+  if (toastTimer) clearTimeout(toastTimer)
+  toastMsg.value = msg; toastType.value = type
+  toastTimer = setTimeout(() => { toastMsg.value = '' }, 3000)
+}
+
+// ── Add account ────────────────────────────────────────────
+const showAddSheet = ref(false)
+const newAcc = reactive({
+  type: 'debit' as Account['type'],
+  name: '', institution: '', lastFour: '', network: 'VISA',
+  initialBalance: '', due: '', nfcEnabled: false, gradientIdx: 0,
+})
+
+const canSubmit = computed(() => newAcc.name.trim().length > 0 && newAcc.institution.trim().length > 0)
+
+function submitAdd() {
   if (!canSubmit.value) return
-  const amount = parseFloat(newCard.limitOrBalance) || 0
-  cards.value.push({
+  const amount = parseFloat(newAcc.initialBalance) || 0
+  const meta   = accountTypeMeta(newAcc.type)
+  const acc: Account = {
     id:          Date.now(),
-    type:        newCard.type,
-    bank:        newCard.bank.trim(),
-    network:     newCard.network,
-    number:      `•••• •••• •••• ${newCard.number.slice(-4).padStart(4,'•')}`,
-    holder:      newCard.holder.trim(),
-    expiry:      newCard.expiry || undefined,
-    gradient:    gradients[newCard.gradientIdx],
-    nfcEnabled:  newCard.nfcEnabled,
-    ...(newCard.type === 'credit'
-      ? { limit: amount, outstanding: 0, due: '—' }
+    type:        newAcc.type,
+    name:        newAcc.name.trim(),
+    institution: newAcc.institution.trim(),
+    lastFour:    newAcc.lastFour || undefined,
+    network:     newAcc.network || undefined,
+    gradient:    gradients[newAcc.gradientIdx] ?? meta.gradient,
+    nfcEnabled:  newAcc.nfcEnabled,
+    ...(newAcc.type === 'credit'
+      ? { limit: amount, outstanding: 0, due: newAcc.due || '—' }
+      : newAcc.type === 'loan'
+      ? { principal: amount, remaining: amount }
       : { balance: amount, spent: 0 }),
-  })
-  goTo(cards.value.length - 1)
-  showAddCard.value = false
-  Object.assign(newCard, { type:'credit', bank:'', number:'', holder:'', expiry:'', network:'VISA', limitOrBalance:'', nfcEnabled:false, gradientIdx:0 })
+  }
+  accounts.value.push(acc)
+  saveAccounts(accounts.value)
+  cardsVersion.value++
+  showAddSheet.value = false
+  showToast(`${acc.name} added!`)
+  orbLog(`Account added: ${acc.name} (${acc.type})`)
+  Object.assign(newAcc, { type:'debit', name:'', institution:'', lastFour:'', network:'VISA', initialBalance:'', due:'', nfcEnabled:false, gradientIdx:0 })
+}
+
+// ── Delete ─────────────────────────────────────────────────
+const showDeleteConfirm = ref(false)
+
+function confirmDelete() {
+  if (!selectedAcc.value) return
+  const name = selectedAcc.value.name
+  accounts.value = accounts.value.filter(a => a.id !== selectedAcc.value!.id)
+  saveAccounts(accounts.value)
+  cardsVersion.value++
+  selectedAcc.value = null
+  showDeleteConfirm.value = false
+  showToast(`${name} removed`, 'error')
+  orbLog(`Account deleted: ${name}`)
+}
+
+function formatAmount(n: number): string {
+  const abs = Math.abs(n)
+  if (abs >= 1_000_000) return (abs/1_000_000).toFixed(2).replace(/\.?0+$/,'') + 'M'
+  return abs.toLocaleString('en-US', { minimumFractionDigits:0, maximumFractionDigits:2 })
 }
 </script>
 
 <style scoped>
-/* Card swipe transitions */
-.card-left-enter-active,
-.card-left-leave-active,
-.card-right-enter-active,
-.card-right-leave-active {
-  transition: transform 0.3s cubic-bezier(0.35, 0, 0.15, 1), opacity 0.3s ease;
-  position: absolute;
-  inset: 0;
+.card-left-enter-active,.card-left-leave-active,
+.card-right-enter-active,.card-right-leave-active {
+  transition:transform .3s cubic-bezier(.35,0,.15,1),opacity .3s ease;position:absolute;inset:0;
 }
-.card-left-enter-from  { transform: translateX(100%); opacity: 0; }
-.card-left-leave-to    { transform: translateX(-100%); opacity: 0; }
-.card-right-enter-from { transform: translateX(-100%); opacity: 0; }
-.card-right-leave-to   { transform: translateX(100%); opacity: 0; }
+.card-left-enter-from  { transform:translateX(100%);  opacity:0; }
+.card-left-leave-to    { transform:translateX(-100%); opacity:0; }
+.card-right-enter-from { transform:translateX(-100%); opacity:0; }
+.card-right-leave-to   { transform:translateX(100%);  opacity:0; }
 
-/* Sheet modal */
-.sheet-enter-active, .sheet-leave-active { transition: opacity .28s ease; }
-.sheet-enter-active > div, .sheet-leave-active > div { transition: transform .32s cubic-bezier(.32,1.1,.64,1); }
-.sheet-enter-from, .sheet-leave-to { opacity: 0; }
-.sheet-enter-from > div, .sheet-leave-to > div { transform: translateY(100%); }
+.sheet-enter-active,.sheet-leave-active{transition:opacity .28s ease;}
+.sheet-enter-active>div,.sheet-leave-active>div{transition:transform .32s cubic-bezier(.32,1.1,.64,1);}
+.sheet-enter-from,.sheet-leave-to{opacity:0;}
+.sheet-enter-from>div,.sheet-leave-to>div{transform:translateY(100%);}
 
-/* Fade */
-.fade-enter-active, .fade-leave-active { transition: opacity .25s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
+.fade-enter-active,.fade-leave-active{transition:opacity .25s ease;}
+.fade-enter-from,.fade-leave-to{opacity:0;}
+
+.toast-enter-active{transition:all .35s cubic-bezier(0.34,1.1,0.64,1);}
+.toast-leave-active{transition:all .25s ease;}
+.toast-enter-from{opacity:0;transform:translate(-50%,-20px) scale(0.92);}
+.toast-leave-to{opacity:0;transform:translate(-50%,-8px) scale(0.96);}
 </style>
