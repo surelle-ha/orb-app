@@ -10,162 +10,111 @@
       <button class="w-10 h-10 rounded-full flex items-center justify-center text-white font-black text-sm active:scale-90 transition-transform" :style="{ background: accent, boxShadow: `0 4px 16px ${accent}50` }">{{ userInitial }}</button>
     </div>
 
-    <!-- ═══ BALANCE CARD — starfield bg ═══ -->
+    <!-- ═══ BALANCE CARD ═══ -->
     <div v-if="totalBalance !== 0 || totalIncome > 0"
       class="mx-4 relative overflow-hidden rounded-3xl"
-      :style="{ height:'290px', background:'#09090b', boxShadow: `0 8px 40px rgba(0,0,0,0.2), 0 0 0 1px ${accent}22` }">
+      :style="{ background:'#09090b', boxShadow: `0 8px 40px rgba(0,0,0,0.25), 0 0 0 1px ${accent}22` }">
 
       <!-- Starfield canvas -->
       <canvas ref="starsCanvas" class="absolute inset-0 pointer-events-none" style="width:100%;height:100%;"></canvas>
 
-      <!-- Violet nebula glow centred behind orb -->
+      <!-- Nebula glow -->
       <div class="absolute inset-0 pointer-events-none"
-        :style="{ background: `radial-gradient(ellipse at 50% 38%, ${accent}40 0%, transparent 62%)` }"></div>
+        :style="{ background: `radial-gradient(ellipse at 50% 30%, ${accent}38 0%, transparent 60%)` }"></div>
 
-      <!--
-        ORBIT RINGS — proper depth illusion
-        Each ring = back-half SVG (behind orb) + front-half SVG (in front of orb).
-        The orb sphere sits between the two layers.
-        Ring origin: left:50%, top:54px (same anchor as before).
-      -->
-
-      <!-- ── BACK halves (rendered first = behind orb) ── -->
-      <div class="absolute pointer-events-none"
-        style="top:54px;left:50%;transform:translateX(-50%);width:1px;height:1px;">
-
-        <!-- Ring 4 back — widest, faintest -->
-        <svg class="absolute orb-h-ring-4"
-          style="width:310px;height:68px;margin-left:-155px;margin-top:-34px;overflow:visible;">
-          <ellipse cx="155" cy="34" rx="154" ry="33"
-            fill="none" :stroke="accent + '12'" stroke-width="1"
-            stroke-dasharray="487" stroke-dashoffset="0"
-            style="filter:blur(1px);"
-            :style="{ clipPath:'ellipse(154px 33px at 155px 34px)' }" />
-          <!-- top arc only = back half -->
-          <path d="M 1,34 A 154,33 0 0,1 309,34"
-            fill="none" :stroke="accent + '12'" stroke-width="1"
-            style="filter:blur(1px);" />
-        </svg>
-
-        <!-- Ring 3 back -->
-        <svg class="absolute orb-h-ring-3"
-          style="width:254px;height:52px;margin-left:-127px;margin-top:-26px;overflow:visible;">
-          <path d="M 1,26 A 126,25 0 0,1 253,26"
-            fill="none" :stroke="accent + '22'" stroke-width="1"
-            style="filter:blur(0.5px);" />
-        </svg>
-
-        <!-- Ring 2 back -->
-        <svg class="absolute orb-h-ring-2"
-          style="width:200px;height:36px;margin-left:-100px;margin-top:-18px;overflow:visible;">
-          <path d="M 1,18 A 99,17 0 0,1 199,18"
-            fill="none" :stroke="accent + '44'" stroke-width="1.5" />
-        </svg>
-
-        <!-- Ring 1 back — brightest, closest -->
-        <svg class="absolute orb-h-ring-1"
-          style="width:144px;height:24px;margin-left:-72px;margin-top:-12px;overflow:visible;">
-          <path d="M 1,12 A 71,11 0 0,1 143,12"
-            fill="none" :stroke="accent + '80'" stroke-width="2"
-            :style="{ filter: `drop-shadow(0 0 4px ${accent}73)` }" />
-        </svg>
-
-        <!-- Disc glow (behind) -->
-        <div class="absolute rounded-full"
-          :style="discGlowBack"></div>
-      </div>
-
-      <!-- ── ORB SPHERE (middle layer) ── -->
-      <div class="absolute pointer-events-none" style="top:14px;left:50%;transform:translateX(-50%);">
-        <div class="absolute rounded-full" :style="orbOuterGlow"></div>
-        <div class="absolute rounded-full" :style="orbLensRing"></div>
-        <div class="relative rounded-full" style="width:80px;height:80px;">
-          <div class="absolute inset-0 rounded-full"
-            :style="orbSphereShadow"></div>
-          <div class="absolute inset-0 rounded-full"
-            :style="{ background: `radial-gradient(circle at 28% 26%, ${accent}2E 0%, transparent 55%)` }"></div>
-        </div>
-        <!-- particles orbit in front layer below, but also add faint ones here for depth -->
-      </div>
-
-      <!-- ── FRONT halves (on top of orb) ── -->
-      <div class="absolute pointer-events-none"
-        style="top:54px;left:50%;transform:translateX(-50%);width:1px;height:1px;">
-
-        <!-- Ring 4 front -->
-        <svg class="absolute orb-h-ring-4"
-          style="width:310px;height:68px;margin-left:-155px;margin-top:-34px;overflow:visible;">
-          <path d="M 1,34 A 154,33 0 0,0 309,34"
-            fill="none" :stroke="accent + '12'" stroke-width="1"
-            style="filter:blur(1px);" />
-        </svg>
-
-        <!-- Ring 3 front -->
-        <svg class="absolute orb-h-ring-3"
-          style="width:254px;height:52px;margin-left:-127px;margin-top:-26px;overflow:visible;">
-          <path d="M 1,26 A 126,25 0 0,0 253,26"
-            fill="none" :stroke="accent + '22'" stroke-width="1"
-            style="filter:blur(0.5px);" />
-        </svg>
-
-        <!-- Ring 2 front -->
-        <svg class="absolute orb-h-ring-2"
-          style="width:200px;height:36px;margin-left:-100px;margin-top:-18px;overflow:visible;">
-          <path d="M 1,18 A 99,17 0 0,0 199,18"
-            fill="none" :stroke="accent + '59'" stroke-width="1.5" />
-        </svg>
-
-        <!-- Ring 1 front — brightest, passes in front -->
-        <svg class="absolute orb-h-ring-1"
-          style="width:144px;height:24px;margin-left:-72px;margin-top:-12px;overflow:visible;">
-          <path d="M 1,12 A 71,11 0 0,0 143,12"
-            fill="none" :stroke="accent + 'BF'" stroke-width="2.5"
-            :style="{ filter: `drop-shadow(0 0 6px ${accent}A6)` }" />
-        </svg>
-
-        <!-- Disc glow (front, lighter) -->
-        <div class="absolute rounded-full"
-          :style="discGlowFront"></div>
-
-        <!-- Orbiting particles (front layer so they pass over orb on correct arc) -->
-        <div class="absolute rounded-full bg-violet-300 orb-h-p1"
-          style="width:3px;height:3px;top:0;left:0;margin:0;opacity:0.9;"></div>
-        <div class="absolute rounded-full bg-violet-400 orb-h-p2"
-          style="width:2px;height:2px;top:0;left:0;margin:0;opacity:0.7;"></div>
-      </div>
-
-
-      <!-- Orb speech bubble — sits above balance text -->
-      <div class="absolute left-4 right-4 pointer-events-none" style="top:152px;">
-        <div class="relative inline-flex max-w-full">
-          <div class="rounded-2xl rounded-bl-none px-3 py-2 text-[11px] font-medium leading-snug max-w-full"
-            style="background:rgba(255,255,255,0.07);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.75);">
-            {{ orbInsight }}
-          </div>
+      <!-- Top row: Orb AI hint label -->
+      <div class="relative flex items-center justify-between px-5 pt-4 pb-1">
+        <p class="text-[10px] font-bold text-zinc-600 uppercase tracking-[0.2em]">Total Balance</p>
+        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+          :style="{ background:`${accent}18`, border:`1px solid ${accent}33` }">
+          <div class="w-1.5 h-1.5 rounded-full" :style="{ background:accent }"></div>
+          <span class="text-[10px] font-bold" :style="{ color:accent }">Tap Orb to chat</span>
         </div>
       </div>
 
-      <!-- Balance text -->
-      <div class="absolute bottom-0 left-0 right-0 flex flex-col items-center pb-5">
-        <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.25em] mb-1">Total Balance</p>
+      <!-- ── CLICKABLE ORB SECTION ── -->
+      <button @click="navigate('orb')"
+        class="relative w-full flex flex-col items-center pt-2 pb-3 active:scale-[0.97] transition-transform duration-200"
+        style="cursor:pointer;">
+
+        <!-- Back ring halves -->
+        <div class="absolute pointer-events-none"
+          style="top:62px;left:50%;transform:translateX(-50%);width:1px;height:1px;">
+          <svg class="absolute orb-h-ring-4" style="width:310px;height:68px;margin-left:-155px;margin-top:-34px;overflow:visible;">
+            <path d="M 1,34 A 154,33 0 0,1 309,34" fill="none" :stroke="accent+'10'" stroke-width="1" style="filter:blur(1px);" />
+          </svg>
+          <svg class="absolute orb-h-ring-3" style="width:254px;height:52px;margin-left:-127px;margin-top:-26px;overflow:visible;">
+            <path d="M 1,26 A 126,25 0 0,1 253,26" fill="none" :stroke="accent+'20'" stroke-width="1" style="filter:blur(0.5px);" />
+          </svg>
+          <svg class="absolute orb-h-ring-2" style="width:200px;height:36px;margin-left:-100px;margin-top:-18px;overflow:visible;">
+            <path d="M 1,18 A 99,17 0 0,1 199,18" fill="none" :stroke="accent+'40'" stroke-width="1.5" />
+          </svg>
+          <svg class="absolute orb-h-ring-1" style="width:144px;height:24px;margin-left:-72px;margin-top:-12px;overflow:visible;">
+            <path d="M 1,12 A 71,11 0 0,1 143,12" fill="none" :stroke="accent+'75'" stroke-width="2"
+              :style="{ filter:`drop-shadow(0 0 4px ${accent}66)` }" />
+          </svg>
+          <div class="absolute rounded-full" :style="discGlowBack"></div>
+        </div>
+
+        <!-- Orb sphere -->
+        <div class="relative mt-1" style="width:88px;height:88px;">
+          <div class="absolute rounded-full" :style="orbOuterGlow"></div>
+          <div class="absolute rounded-full" :style="orbLensRing"></div>
+          <div class="absolute inset-0 rounded-full" :style="orbSphereShadow"></div>
+          <div class="absolute inset-0 rounded-full"
+            :style="{ background:`radial-gradient(circle at 28% 26%, ${accent}2E 0%, transparent 55%)` }"></div>
+        </div>
+
+        <!-- Front ring halves + particles -->
+        <div class="absolute pointer-events-none"
+          style="top:62px;left:50%;transform:translateX(-50%);width:1px;height:1px;">
+          <svg class="absolute orb-h-ring-4" style="width:310px;height:68px;margin-left:-155px;margin-top:-34px;overflow:visible;">
+            <path d="M 1,34 A 154,33 0 0,0 309,34" fill="none" :stroke="accent+'10'" stroke-width="1" style="filter:blur(1px);" />
+          </svg>
+          <svg class="absolute orb-h-ring-3" style="width:254px;height:52px;margin-left:-127px;margin-top:-26px;overflow:visible;">
+            <path d="M 1,26 A 126,25 0 0,0 253,26" fill="none" :stroke="accent+'20'" stroke-width="1" style="filter:blur(0.5px);" />
+          </svg>
+          <svg class="absolute orb-h-ring-2" style="width:200px;height:36px;margin-left:-100px;margin-top:-18px;overflow:visible;">
+            <path d="M 1,18 A 99,17 0 0,0 199,18" fill="none" :stroke="accent+'55'" stroke-width="1.5" />
+          </svg>
+          <svg class="absolute orb-h-ring-1" style="width:144px;height:24px;margin-left:-72px;margin-top:-12px;overflow:visible;">
+            <path d="M 1,12 A 71,11 0 0,0 143,12" fill="none" :stroke="accent+'BB'" stroke-width="2.5"
+              :style="{ filter:`drop-shadow(0 0 6px ${accent}99)` }" />
+          </svg>
+          <div class="absolute rounded-full" :style="discGlowFront"></div>
+          <div class="absolute rounded-full orb-h-p1" style="width:3px;height:3px;top:0;left:0;"
+            :style="{ background:accent, opacity:0.9 }"></div>
+          <div class="absolute rounded-full orb-h-p2" style="width:2px;height:2px;top:0;left:0;"
+            :style="{ background:accent, opacity:0.7 }"></div>
+        </div>
+
+        <!-- Orb insight label (small, below orb) -->
+        <div class="relative mt-10 mx-5 px-3.5 py-1.5 rounded-xl text-center max-w-[260px]"
+          style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);">
+          <p class="text-[11px] font-medium leading-snug" style="color:rgba(255,255,255,0.55);">{{ orbInsight }}</p>
+        </div>
+      </button>
+
+      <!-- Balance text + income/expense row -->
+      <div class="relative flex flex-col items-center pb-5 px-5">
         <div class="flex items-baseline gap-1.5">
-          <span class="text-[17px] font-bold text-violet-400">{{ sym }}</span>
-          <span :class="['text-[40px] font-black tracking-tight leading-none', totalBalance < 0 ? 'text-rose-300' : 'text-white']">
+          <span class="text-[17px] font-bold" :style="{ color:accent }">{{ sym }}</span>
+          <span :class="['text-[42px] font-black tracking-tight leading-none', totalBalance < 0 ? 'text-rose-300' : 'text-white']">
             {{ showBalance ? formatAmount(totalBalance) : '•••,•••' }}
           </span>
-          <button @click="showBalance = !showBalance" class="mb-1 active:scale-90 transition-transform">
+          <button @click.stop="showBalance = !showBalance" class="mb-1 active:scale-90 transition-transform">
             <Eye    v-if="showBalance" :size="15" class="text-zinc-600" :stroke-width="2" />
             <EyeOff v-else             :size="15" class="text-zinc-600" :stroke-width="2" />
           </button>
         </div>
-        <div class="flex items-center gap-2.5 mt-2">
-          <div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+        <div class="flex items-center gap-3 mt-2.5">
+          <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
             <TrendingUp :size="11" class="text-emerald-400" :stroke-width="2.5" />
-            <span class="text-[11px] font-bold text-emerald-400">{{ sym }}{{ formatAmount(totalIncome) }}</span>
+            <span class="text-[12px] font-bold text-emerald-400">{{ sym }}{{ formatAmount(totalIncome) }}</span>
           </div>
-          <div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20">
+          <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/20">
             <TrendingDown :size="11" class="text-rose-400" :stroke-width="2.5" />
-            <span class="text-[11px] font-bold text-rose-400">{{ sym }}{{ formatAmount(totalExpenses) }}</span>
+            <span class="text-[12px] font-bold text-rose-400">{{ sym }}{{ formatAmount(totalExpenses) }}</span>
           </div>
         </div>
       </div>
@@ -343,7 +292,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import {
   Eye, EyeOff, TrendingUp, TrendingDown,
   CreditCard, ShoppingCart, Zap, BarChart2,
@@ -359,8 +308,21 @@ import {
 
 const { navigate } = useNav()
 
-const hour      = new Date().getHours()
-const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
+const currentHour = ref(new Date().getHours())
+// Update greeting every minute so it stays accurate
+let greetingTimer: ReturnType<typeof setInterval> | null = null
+onMounted(() => {
+  greetingTimer = setInterval(() => { currentHour.value = new Date().getHours() }, 60_000)
+})
+onUnmounted(() => { if (greetingTimer) clearInterval(greetingTimer) })
+
+const timeOfDay = computed(() => {
+  const h = currentHour.value
+  if (h >= 5  && h < 12) return 'morning'
+  if (h >= 12 && h < 17) return 'afternoon'
+  if (h >= 17 && h < 21) return 'evening'
+  return 'night'
+})
 const showBalance = ref(true)
 const sym         = computed(() => settings.value.currencySymbol)
 const accent      = computed(() => settings.value.accentColor)
@@ -534,7 +496,7 @@ const heatmapData = computed(() => {
   const map = new Map<string, DayData>()
   for (const tx of transactions.value) {
     const key = tx.isoDate.slice(0, 10)
-    const d = map.get(key) ?? { income: 0, expense: 0, count: 0 }
+    const d = map.get(key) || { income: 0, expense: 0, count: 0 }
     if (tx.amount > 0) d.income  += tx.amount
     else               d.expense += Math.abs(tx.amount)
     d.count++
@@ -559,7 +521,7 @@ const heatmapData = computed(() => {
         key, isFuture,
         intensity:  isFuture ? 0 : maxTotal > 0 ? total / maxTotal : 0,
         isToday:    key === todayKey,
-        count:      data?.count ?? 0,
+        count:      data ? data.count : 0,
         hasExpense: !!(data?.expense),
         hasIncome:  !!(data?.income),
       })

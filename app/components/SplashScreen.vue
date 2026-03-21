@@ -3,28 +3,27 @@
     <div v-if="visible"
       class="fixed inset-0 z-[9999] flex items-center justify-center bg-zinc-950 overflow-hidden">
 
-      <!-- Ambient background glow -->
+      <!-- Ambient background glow — uses accent color -->
       <div class="absolute inset-0">
-        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full glow-blob"
-             :class="glowActive ? 'opacity-30' : 'opacity-0'"></div>
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full transition-opacity duration-[1200ms]"
+          :class="glowActive ? 'opacity-30' : 'opacity-0'"
+          :style="{ background: `radial-gradient(circle, ${accent} 0%, ${accentDark} 40%, transparent 70%)` }"></div>
       </div>
 
-      <!-- Blackhole wrapper — transition targets this element via ref -->
-      <div ref="logoRef" class="relative flex items-center justify-center logo-wrap" :class="logoScale">
+      <!-- Orb wrapper -->
+      <div class="relative flex items-center justify-center logo-wrap" :class="logoScale">
 
-        <!-- Accretion disc rings -->
-        <div
-          v-for="ring in rings"
-          :key="ring.id"
+        <!-- Accretion disc rings — all use accent color -->
+        <div v-for="ring in rings" :key="ring.id"
           class="absolute rounded-full ring-el"
           :style="{
-            width:        ring.size + 'px',
-            height:       ring.size + 'px',
-            opacity:      ring.opacity,
+            width:  ring.size + 'px',
+            height: ring.size + 'px',
+            opacity: ring.opacity,
             borderWidth:  ring.thick + 'px',
             borderStyle:  'solid',
-            borderColor:  `rgba(139,92,246,${ring.alpha})`,
-            animationName:     ring.dir === 'reverse' ? 'orb-spin-r' : 'orb-spin',
+            borderColor:  accentWithAlpha(ring.alpha),
+            animationName: ring.dir === 'reverse' ? 'orb-spin-r' : 'orb-spin',
             animationDuration: ring.dur + 's',
             animationTimingFunction: 'linear',
             animationIterationCount: 'infinite',
@@ -33,46 +32,43 @@
         ></div>
 
         <!-- Lensing glow -->
-        <div class="absolute rounded-full lens-glow" style="width:88px;height:88px"></div>
+        <div class="absolute rounded-full lens-glow" style="width:88px;height:88px;"
+          :style="{ boxShadow: `0 0 40px 12px ${accentWithAlpha(0.5)}, 0 0 80px 24px ${accentWithAlpha(0.25)}` }"></div>
 
         <!-- Event horizon -->
         <div class="relative w-20 h-20 rounded-full flex items-center justify-center horizon">
-          <div class="absolute inset-0 rounded-full shimmer"></div>
+          <div class="absolute inset-0 rounded-full shimmer"
+            :style="{ background: `radial-gradient(circle at 30% 30%, ${accentWithAlpha(0.15)} 0%, transparent 60%)` }"></div>
           <span class="relative z-10 orb-wordmark">ORB</span>
         </div>
 
         <!-- Orbiting particles -->
-        <div
-          v-for="p in particles"
-          :key="'p' + p.id"
-          class="absolute rounded-full bg-violet-400 particle"
+        <div v-for="p in particles" :key="'p' + p.id"
+          class="absolute rounded-full particle"
           :style="{
             width:   p.size + 'px',
             height:  p.size + 'px',
             opacity: p.alpha,
-            animationName:     'orb-orbit-' + p.id,
+            background: accent,
+            animationName: 'orb-orbit-' + p.id,
             animationDuration: p.dur + 's',
             animationTimingFunction: 'linear',
             animationIterationCount: 'infinite',
           }"
         ></div>
-
       </div>
 
       <!-- Tagline -->
-      <div
-        class="absolute bottom-20 flex flex-col items-center gap-1 tagline-wrap"
-        :class="textVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'"
-      >
+      <div class="absolute bottom-20 flex flex-col items-center gap-1 tagline-wrap"
+        :class="textVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'">
         <p class="text-[11px] font-bold text-zinc-600 tracking-[0.3em] uppercase">Your Financial Universe</p>
       </div>
-
     </div>
   </Transition>
 </template>
 
-<script setup>
-import { ref, onMounted } from 'vue'
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
 
 const emit = defineEmits(['done'])
 
@@ -80,6 +76,39 @@ const visible     = ref(true)
 const glowActive  = ref(false)
 const textVisible = ref(false)
 const logoScale   = ref('scale-75 opacity-0')
+
+// ── Read accent from localStorage (same key as useStore) ──────
+const SETTINGS_KEY = 'orb_settings_v1'
+function readAccent(): string {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (parsed?.accentColor) return parsed.accentColor
+    }
+  } catch {}
+  return '#8b5cf6' // default violet
+}
+
+const accentHex = ref(readAccent())
+const accent    = computed(() => accentHex.value)
+
+// Derive a darker shade for gradient (mix with black)
+const accentDark = computed(() => {
+  const hex = accentHex.value.replace('#', '')
+  const r = Math.round(parseInt(hex.slice(0,2),16) * 0.6)
+  const g = Math.round(parseInt(hex.slice(2,4),16) * 0.6)
+  const b = Math.round(parseInt(hex.slice(4,6),16) * 0.6)
+  return `rgb(${r},${g},${b})`
+})
+
+function accentWithAlpha(a: number): string {
+  const hex = accentHex.value.replace('#','')
+  const r = parseInt(hex.slice(0,2),16)
+  const g = parseInt(hex.slice(2,4),16)
+  const b = parseInt(hex.slice(4,6),16)
+  return `rgba(${r},${g},${b},${a})`
+}
 
 const rings = [
   { id:1, size:130, thick:1,   alpha:0.6,  opacity:0.8,  dur:8,  dir:'normal',  delay:0    },
@@ -98,6 +127,8 @@ const particles = [
 ]
 
 onMounted(async () => {
+  // Re-read accent in case it was written after import
+  accentHex.value = readAccent()
   await delay(120)
   glowActive.value = true
   logoScale.value  = 'scale-100 opacity-100'
@@ -109,92 +140,61 @@ onMounted(async () => {
   emit('done')
 })
 
-function delay(ms) {
+function delay(ms: number) {
   return new Promise(r => setTimeout(r, ms))
 }
 </script>
 
 <style scoped>
-/* ── Font ─────────────────────────────────── */
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@900&display=swap');
 
-/* ── Keyframes ────────────────────────────── */
-@keyframes orb-spin {
-  from { transform: rotate(0deg);   }
-  to   { transform: rotate(360deg); }
-}
-@keyframes orb-spin-r {
-  from { transform: rotate(360deg); }
-  to   { transform: rotate(0deg);   }
-}
+@keyframes orb-spin   { from{transform:rotate(0deg)}   to{transform:rotate(360deg)}  }
+@keyframes orb-spin-r { from{transform:rotate(360deg)} to{transform:rotate(0deg)}    }
 
-/* Particle orbits — each on its own radius/phase */
 @keyframes orb-orbit-1 {
-  0%   { transform: rotate(0deg)   translateX(54px)  rotate(0deg);    }
-  100% { transform: rotate(360deg) translateX(54px)  rotate(-360deg); }
+  0%   { transform:rotate(0deg)   translateX(54px)  rotate(0deg);    }
+  100% { transform:rotate(360deg) translateX(54px)  rotate(-360deg); }
 }
 @keyframes orb-orbit-2 {
-  0%   { transform: rotate(120deg) translateX(70px)  rotate(-120deg); }
-  100% { transform: rotate(480deg) translateX(70px)  rotate(-480deg); }
+  0%   { transform:rotate(120deg) translateX(70px)  rotate(-120deg); }
+  100% { transform:rotate(480deg) translateX(70px)  rotate(-480deg); }
 }
 @keyframes orb-orbit-3 {
-  0%   { transform: rotate(240deg) translateX(90px)  rotate(-240deg); }
-  100% { transform: rotate(600deg) translateX(90px)  rotate(-600deg); }
+  0%   { transform:rotate(240deg) translateX(90px)  rotate(-240deg); }
+  100% { transform:rotate(600deg) translateX(90px)  rotate(-600deg); }
 }
 @keyframes orb-orbit-4 {
-  0%   { transform: rotate(60deg)  translateX(110px) rotate(-60deg);  }
-  100% { transform: rotate(420deg) translateX(110px) rotate(-420deg); }
+  0%   { transform:rotate(60deg)  translateX(110px) rotate(-60deg);  }
+  100% { transform:rotate(420deg) translateX(110px) rotate(-420deg); }
 }
 @keyframes orb-orbit-5 {
-  0%   { transform: rotate(180deg) translateX(130px) rotate(-180deg); }
-  100% { transform: rotate(540deg) translateX(130px) rotate(-540deg); }
-}
-
-/* ── Elements ─────────────────────────────── */
-.glow-blob {
-  background: radial-gradient(circle, #7c3aed 0%, #4c1d95 40%, transparent 70%);
-  transition: opacity 1.2s ease;
+  0%   { transform:rotate(180deg) translateX(130px) rotate(-180deg); }
+  100% { transform:rotate(540deg) translateX(130px) rotate(-540deg); }
 }
 
 .logo-wrap {
-  transition: transform 1.2s cubic-bezier(0.34, 1.1, 0.64, 1),
-              opacity   1.2s ease;
-}
-
-.lens-glow {
-  box-shadow:
-    0 0 40px 12px rgba(139, 92, 246, 0.5),
-    0 0 80px 24px rgba(109, 40, 217, 0.25);
+  transition: transform 1.2s cubic-bezier(0.34,1.1,0.64,1), opacity 1.2s ease;
 }
 
 .horizon {
   background: radial-gradient(circle at 40% 35%, #18181b 0%, #09090b 60%, #000 100%);
-  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.9);
-}
-
-.shimmer {
-  background: radial-gradient(circle at 30% 30%, rgba(139, 92, 246, 0.15) 0%, transparent 60%);
+  box-shadow: inset 0 0 20px rgba(0,0,0,0.9);
 }
 
 .orb-wordmark {
   font-family: 'Nunito', sans-serif;
   font-weight: 900;
   font-size: 15px;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255,255,255,0.9);
   letter-spacing: 0.25em;
 }
 
 .tagline-wrap {
-  transition: opacity 0.8s cubic-bezier(0.34, 1.1, 0.64, 1),
-              transform 0.8s cubic-bezier(0.34, 1.1, 0.64, 1);
+  transition: opacity 0.8s cubic-bezier(0.34,1.1,0.64,1), transform 0.8s cubic-bezier(0.34,1.1,0.64,1);
 }
 
-/* ── Splash exit transition ───────────────── */
 .splash-out-leave-active {
-  transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.4,0,0.2,1);
 }
-.splash-out-leave-to {
-  opacity: 0;
-  transform: scale(1.06);
-}
+.splash-out-leave-to { opacity:0; transform:scale(1.06); }
 </style>

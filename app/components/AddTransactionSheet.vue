@@ -35,8 +35,9 @@
           <div class="flex items-center gap-2 bg-slate-50 dark:bg-zinc-800 rounded-2xl px-4 py-3.5 border-2 border-transparent focus-within:border-violet-500 transition-colors">
             <span class="text-[26px] font-black text-violet-500">{{ sym }}</span>
             <input
-              v-model="form.amount"
-              type="number"
+              :value="form.amountDisplay"
+              @input="onAmountInput"
+              @keydown="onAmountKeydown"
               inputmode="decimal"
               placeholder="0.00"
               class="flex-1 bg-transparent text-[32px] font-black text-slate-900 dark:text-zinc-50 placeholder:text-slate-200 dark:placeholder:text-zinc-700 outline-none tracking-tight"
@@ -162,27 +163,55 @@ const expenseCategories = [
 ]
 
 const form = reactive({
-  type:      'expense',
-  desc:      '',
-  amount:    '',
-  category:  'Food',
-  accountId: null as number | null,
+  type:          'expense',
+  desc:          '',
+  amountDisplay: '',   // formatted string shown to user e.g. "1,234.56"
+  amountRaw:     '',   // raw numeric string e.g. "1234.56"
+  category:      'Food',
+  accountId:     null as number | null,
 })
 
+// Format a raw string to comma-separated display
+function formatDisplay(raw: string): string {
+  if (!raw) return ''
+  const parts = raw.split('.')
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return parts.join('.')
+}
+
+function onAmountInput(e: Event) {
+  const el = e.target as HTMLInputElement
+  let cleaned = el.value.replace(/[^0-9.]/g, '')
+  const firstDot = cleaned.indexOf('.')
+  if (firstDot !== -1)
+    cleaned = cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '')
+  if (cleaned.indexOf('.') !== -1 && cleaned.length - cleaned.indexOf('.') > 3)
+    cleaned = cleaned.slice(0, cleaned.indexOf('.') + 3)
+  form.amountRaw     = cleaned
+  form.amountDisplay = formatDisplay(cleaned)
+  el.value = form.amountDisplay
+}
+
+function onAmountKeydown(e: KeyboardEvent) {
+  if ([8,9,27,37,38,39,40,46,35,36].includes(e.keyCode)) return
+  if (e.ctrlKey || e.metaKey) return
+  if (!/[0-9.]/.test(e.key)) e.preventDefault()
+}
+
 const canSubmit = computed(() =>
-  form.desc.trim().length > 0 && form.amount && parseFloat(form.amount) > 0
+  form.desc.trim().length > 0 && form.amountRaw && parseFloat(form.amountRaw) > 0
 )
 
 function submit() {
   if (!canSubmit.value) return
-  const amt = parseFloat(form.amount)
+  const amt = parseFloat(form.amountRaw)
   addTx({
     name:      form.desc.trim(),
     amount:    form.type === 'income' ? amt : -amt,
     category:  form.type === 'income' ? 'Income' : form.category,
     accountId: form.accountId,
   })
-  Object.assign(form, { type:'expense', desc:'', amount:'', category:'Food', accountId:null })
+  Object.assign(form, { type:'expense', desc:'', amountDisplay:'', amountRaw:'', category:'Food', accountId:null })
   quickAddOpen.value = false
 }
 </script>

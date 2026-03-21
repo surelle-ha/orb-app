@@ -55,7 +55,9 @@
     </nav>
   </div>
 
-  <AddTransactionSheet />
+  <Teleport to="body">
+    <AddTransactionSheet />
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -73,6 +75,7 @@ import More        from '../pages/more.vue'
 import Settings    from '../pages/settings.vue'
 import Developer   from '../pages/developer.vue'
 import Transactions from '../pages/transaction.vue'
+import OrbChat     from '../components/OrbChat.vue'
 
 const { activePage, transitionName, navigate, TAB_ORDER } = useNav()
 const { isDark } = useDark()
@@ -84,7 +87,7 @@ const PAGE_MAP: Record<string,any> = {
   home: Index, cards: Cards, grocery: Grocery,
   bills: Bills, more: More,
   settings: Settings, developer: Developer,
-  transactions: Transactions,
+  transactions: Transactions, orb: OrbChat,
 }
 const currentPage = computed(() => PAGE_MAP[activePage.value])
 

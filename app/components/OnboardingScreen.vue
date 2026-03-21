@@ -122,8 +122,10 @@
               answers[currentStepData.key] ? 'border-violet-500' : 'border-zinc-800']">
               <span v-if="currentStepData.prefix" class="text-[20px] font-black text-violet-400">{{ currentStepData.prefix }}</span>
               <input
-                v-model="answers[currentStepData.key]"
-                type="number"
+                :value="formatNumberDisplay(answers[currentStepData.key])"
+                @input="onNumberInput($event, currentStepData.key)"
+                @keydown="onNumberKeydown"
+                inputmode="decimal"
                 :placeholder="currentStepData.placeholder || '0'"
                 class="flex-1 bg-transparent text-[32px] font-black text-white placeholder:text-zinc-700 outline-none tracking-tight"
               />
@@ -170,7 +172,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, reactive } from 'vue'
 import {
   User, DollarSign, Target, TrendingUp,
@@ -284,7 +286,7 @@ const steps = [
 // ── State ─────────────────────────────────────────────────
 const currentStep    = ref(1)
 const stepTransition = ref('step-forward')
-const answers        = reactive({ user_name: '', currency: 'USD' })
+const answers = reactive({ user_name: '', currency: 'USD' })
 
 steps.forEach(s => { if (s.type === 'slider') answers[s.key] = s.min })
 
@@ -296,16 +298,42 @@ const canProceed = computed(() => {
   if (s.type === 'name')     return answers.user_name.trim().length >= 1
   if (s.type === 'currency') return !!answers.currency
   const val = answers[s.key]
-  if (s.type === 'multi')    return (val?.length ?? 0) > 0
+  if (s.type === 'multi')    return (val && val.length ? val.length : 0) > 0
   if (s.type === 'number')   return val !== undefined && val !== '' && parseFloat(val) >= 0
   if (s.type === 'slider')   return true
   return !!val
 })
 
+// ── Number input formatting ────────────────────────────────
+function formatNumberDisplay(raw: string | number | undefined): string {
+  if (raw === undefined || raw === '') return ''
+  const str = String(raw).replace(/,/g, '')
+  const parts = str.split('.')
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return parts.join('.')
+}
+
+function onNumberInput(e: Event, key: string) {
+  const el = e.target as HTMLInputElement
+  let cleaned = el.value.replace(/[^0-9.]/g, '')
+  const firstDot = cleaned.indexOf('.')
+  if (firstDot !== -1)
+    cleaned = cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '')
+  answers[key] = cleaned
+  el.value = formatNumberDisplay(cleaned)
+}
+
+function onNumberKeydown(e: KeyboardEvent) {
+  if ([8,9,27,37,38,39,40,46,35,36].includes(e.keyCode)) return
+  if (e.ctrlKey || e.metaKey) return
+  if (!/[0-9.]/.test(e.key)) e.preventDefault()
+}
+
 const sliderLabel = computed(() => {
   const s = currentStepData.value
   if (s.type !== 'slider') return ''
-  return (answers[s.key] ?? s.min) + '%'
+  const val = answers[s.key]
+  return (val !== undefined ? val : s.min) + '%'
 })
 
 // ── Actions ───────────────────────────────────────────────
@@ -336,7 +364,7 @@ async function next() {
 async function skipAll() { await saveAndFinish() }
 
 async function saveAndFinish() {
-  const chosen = CURRENCIES.find(c => c.code === answers.currency) ?? CURRENCIES[0]
+  const chosen = CURRENCIES.find(c => c.code === answers.currency) || CURRENCIES[0]
   const name   = answers.user_name.trim()
 
   // Persist to settings (available immediately across the whole app)
