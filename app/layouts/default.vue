@@ -67,15 +67,19 @@ import { useNav }       from '../composables/useNav'
 import { useDark }      from '../composables/useDark'
 import { quickAddOpen, settings, orbLog, overdueBillsCount } from '../composables/useStore'
 import { useShake }     from '../composables/useShake'
-import Index       from '../pages/index.vue'
-import Cards       from '../pages/cards.vue'
-import Grocery     from '../pages/grocery.vue'
-import Bills       from '../pages/bills.vue'
-import More        from '../pages/more.vue'
-import Settings    from '../pages/settings.vue'
-import Developer   from '../pages/developer.vue'
+import AddTransactionSheet from '../components/AddTransactionSheet.vue'
+import Index        from '../pages/index.vue'
+import Cards        from '../pages/cards.vue'
+import Grocery      from '../pages/grocery.vue'
+import Bills        from '../pages/bills.vue'
+import More         from '../pages/more.vue'
+import Settings     from '../pages/settings.vue'
+import Developer    from '../pages/developer.vue'
 import Transactions from '../pages/transaction.vue'
-import OrbChat     from '../components/OrbChat.vue'
+import OrbChat      from '../components/OrbChat.vue'
+import Profile      from '../pages/profile.vue'
+import Randomizer   from '../pages/randomizer.vue'
+import About        from '../pages/about.vue'
 
 const { activePage, transitionName, navigate, TAB_ORDER } = useNav()
 const { isDark } = useDark()
@@ -88,6 +92,8 @@ const PAGE_MAP: Record<string,any> = {
   bills: Bills, more: More,
   settings: Settings, developer: Developer,
   transactions: Transactions, orb: OrbChat,
+  profile: Profile, randomizer: Randomizer,
+  about: About,
 }
 const currentPage = computed(() => PAGE_MAP[activePage.value])
 
@@ -103,7 +109,6 @@ function handlePop() {
 onMounted(() => { history.pushState({ page: activePage.value }, ''); window.addEventListener('popstate', handlePop) })
 onUnmounted(() => window.removeEventListener('popstate', handlePop))
 
-// Shake — respects settings toggle
 useShake(() => {
   if (settings.value.shakeToAdd && !quickAddOpen.value) {
     quickAddOpen.value = true

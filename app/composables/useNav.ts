@@ -1,7 +1,10 @@
 // composables/useNav.ts
 import { ref, readonly } from 'vue'
 
-export type PageId = 'home' | 'cards' | 'grocery' | 'bills' | 'more' | 'settings' | 'developer' | 'orb'
+export type PageId =
+  | 'home' | 'cards' | 'grocery' | 'bills' | 'more'
+  | 'settings' | 'developer' | 'orb'
+  | 'profile' | 'randomizer' | 'transactions' | 'about'
 
 const TAB_ORDER: PageId[] = ['home', 'cards', 'grocery', 'bills', 'more']
 

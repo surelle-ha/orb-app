@@ -5,7 +5,7 @@
     <Transition name="toast">
       <div v-if="toastMsg"
         class="fixed left-1/2 -translate-x-1/2 z-[999] flex items-center gap-2.5 px-5 py-3.5 rounded-2xl shadow-xl"
-        :style="{ top:'calc(16px + env(safe-area-inset-top))', background: toastType==='success'?'linear-gradient(135deg,#4c1d95,#6d28d9)':'#dc2626', maxWidth:'360px', width:'calc(100vw - 32px)' }"
+        :style="{ top:'calc(16px + env(safe-area-inset-top))', background: toastType==='success'?`linear-gradient(135deg,${accent}cc,${accent}ee)`:'#dc2626', maxWidth:'360px', width:'calc(100vw - 32px)' }"
       >
         <div class="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
           <Check v-if="toastType==='success'" :size="13" color="white" :stroke-width="3" />
@@ -49,8 +49,8 @@
       <div class="text-right">
         <p class="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">{{ filteredAccounts.length }} accounts</p>
         <div class="flex gap-2 mt-1 justify-end">
-          <span class="text-[11px] font-bold text-emerald-500">↑ {{ sym }}{{ formatAmount(totalAssets) }}</span>
-          <span class="text-[11px] font-bold text-rose-400">↓ {{ sym }}{{ formatAmount(totalLiabilities) }}</span>
+          <span class="text-[11px] font-bold text-emerald-500">↑ {{ sym }}{{ formatAmount(totalAssets) }} in</span>
+          <span class="text-[11px] font-bold text-rose-400">↓ {{ sym }}{{ formatAmount(totalLiabilities) }} out</span>
         </div>
       </div>
     </div>
@@ -78,7 +78,6 @@
           @click="selectAccount(acc)"
           :class="['flex items-center gap-3 px-4 py-3.5 cursor-pointer active:bg-slate-50 dark:active:bg-zinc-800/80 transition-colors',
             i < group.items.length - 1 ? 'border-b border-slate-100 dark:border-zinc-800/60' : '']">
-          <!-- Color dot / icon -->
           <div class="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0"
             :style="{ background: acc.gradient }">
             <component :is="accountTypeMeta(acc.type).icon" :size="18" color="rgba(255,255,255,0.85)" :stroke-width="2" />
@@ -102,60 +101,6 @@
           <ChevronRight :size="15" class="text-slate-300 dark:text-zinc-700 flex-shrink-0 ml-1" :stroke-width="2" />
         </div>
       </div>
-    </div>
-
-    <!-- Recent charges for selected account -->
-    <div v-if="selectedAcc" class="mt-4">
-      <div class="flex items-center justify-between px-5 pb-2">
-        <h3 class="text-[13px] font-bold text-slate-800 dark:text-zinc-200">{{ selectedAcc.name }} — Recent</h3>
-        <button @click="selectedAcc = null" class="text-[11px] font-bold text-violet-500 active:opacity-60">Dismiss</button>
-      </div>
-      <div class="mx-4 rounded-2xl overflow-hidden bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm">
-        <div v-if="accountTxns.length === 0" class="py-8 text-center">
-          <p class="text-[13px] font-bold text-slate-400 dark:text-zinc-600">No transactions for this account</p>
-        </div>
-        <div v-for="(tx, i) in accountTxns.slice(0, 5)" :key="tx.id"
-          :class="['flex items-center gap-3 px-4 py-3.5',
-            i < Math.min(4, accountTxns.length - 1) ? 'border-b border-slate-100 dark:border-zinc-800/60' : '']">
-          <div class="w-10 h-10 rounded-2xl bg-violet-50 dark:bg-violet-950/40 flex items-center justify-center flex-shrink-0">
-            <component :is="tx.icon" :size="17" class="text-violet-500" :stroke-width="1.8" />
-          </div>
-          <div class="flex-1 min-w-0">
-            <p class="text-[13px] font-bold text-slate-800 dark:text-zinc-100 truncate">{{ tx.name }}</p>
-            <p class="text-[10px] text-slate-400 dark:text-zinc-500 mt-0.5">{{ tx.category }} · {{ tx.date }}</p>
-          </div>
-          <span :class="['text-[13px] font-bold', tx.amount > 0 ? 'text-emerald-500' : 'text-slate-700 dark:text-zinc-300']">
-            {{ tx.amount > 0 ? '+' : '−' }}{{ sym }}{{ formatAmount(Math.abs(tx.amount)) }}
-          </span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Credit utilization for selected credit account -->
-    <div v-if="selectedAcc && selectedAcc.type === 'credit'" class="mx-4 mt-3 rounded-2xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm p-4">
-      <div class="flex justify-between items-center mb-2">
-        <p class="text-[12px] font-bold text-slate-500 dark:text-zinc-400">Credit Utilization</p>
-        <p class="text-[15px] font-black text-slate-800 dark:text-zinc-100">{{ utilizationPct }}%</p>
-      </div>
-      <div class="h-2 bg-slate-100 dark:bg-zinc-800 rounded-full overflow-hidden mb-2">
-        <div :class="['h-full rounded-full transition-all duration-700',
-          utilizationPct > 70 ? 'bg-rose-500' : utilizationPct > 40 ? 'bg-amber-500' : 'bg-violet-500']"
-          :style="{ width: Math.min(100, utilizationPct) + '%' }"></div>
-      </div>
-      <div class="flex justify-between text-[11px] font-semibold text-slate-400 dark:text-zinc-500">
-        <span>Due {{ selectedAcc.due ?? '—' }}</span>
-        <span :class="utilizationPct > 70 ? 'text-rose-500' : 'text-emerald-500'">
-          {{ sym }}{{ formatAmount((selectedAcc.limit ?? 0) - (selectedAcc.outstanding ?? 0)) }} available
-        </span>
-      </div>
-    </div>
-
-    <!-- Delete button for selected account -->
-    <div v-if="selectedAcc" class="flex justify-center mt-3">
-      <button @click="showDeleteConfirm = true"
-        class="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[12px] font-bold text-rose-400 active:opacity-60">
-        <Trash2 :size="13" :stroke-width="2" /> Remove account
-      </button>
     </div>
 
     <div class="h-4"></div>
@@ -225,6 +170,12 @@
                 class="flex-1 bg-transparent text-[20px] font-black text-slate-900 dark:text-zinc-50 placeholder:text-slate-300 dark:placeholder:text-zinc-700 outline-none" />
             </div>
 
+            <!-- Note about balance adding to total -->
+            <p v-if="!['credit','loan'].includes(newAcc.type) && parseFloat(newAcc.initialBalance) > 0"
+              class="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl px-3 py-2 border border-emerald-200 dark:border-emerald-800/40">
+              ✓ {{ sym }}{{ parseFloat(newAcc.initialBalance).toLocaleString() }} will be added to your total balance as an income transaction
+            </p>
+
             <!-- Due date (credit only) -->
             <input v-if="newAcc.type === 'credit'" v-model="newAcc.due" placeholder="Due date (e.g. 5th of month)"
               class="w-full bg-slate-50 dark:bg-zinc-800 rounded-2xl px-4 py-3.5 text-[14px] font-semibold text-slate-900 dark:text-zinc-50 placeholder:text-slate-300 dark:placeholder:text-zinc-600 border-2 border-transparent focus:border-violet-500 outline-none transition-colors" />
@@ -268,6 +219,111 @@
     </Transition>
   </Teleport>
 
+  <!-- ── Account Detail Overlay ── -->
+  <Teleport to="body">
+    <Transition name="sheet">
+      <div v-if="selectedAcc"
+        class="fixed inset-0 z-[200] flex items-end justify-center"
+        style="background:rgba(0,0,0,0.5);backdrop-filter:blur(10px)"
+        @click.self="selectedAcc = null">
+        <div class="w-full max-w-[430px] bg-white dark:bg-zinc-900 rounded-t-[32px] border-t border-slate-200/60 dark:border-zinc-800 overflow-hidden"
+          :style="{ paddingBottom:'calc(28px + env(safe-area-inset-bottom))' }">
+
+          <!-- Gradient header -->
+          <div class="px-5 pt-5 pb-4 flex items-center gap-4" :style="{ background: selectedAcc.gradient }">
+            <div class="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center flex-shrink-0">
+              <component :is="accountTypeMeta(selectedAcc.type).icon" :size="22" color="white" :stroke-width="2" />
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-[11px] font-bold text-white/50 uppercase tracking-widest">{{ accountTypeMeta(selectedAcc.type).label }}</p>
+              <p class="text-[20px] font-black text-white leading-tight truncate">{{ selectedAcc.name }}</p>
+              <p class="text-[12px] text-white/60 mt-0.5">{{ selectedAcc.institution }}<span v-if="selectedAcc.lastFour" class="font-mono"> ···{{ selectedAcc.lastFour }}</span></p>
+            </div>
+            <button @click="selectedAcc = null"
+              class="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center active:scale-90 transition-transform flex-shrink-0">
+              <X :size="15" color="white" :stroke-width="2.5" />
+            </button>
+          </div>
+
+          <div class="px-5 pt-4 flex flex-col gap-4 max-h-[65vh] overflow-y-auto" style="-webkit-overflow-scrolling:touch;">
+
+            <!-- Balance / limit row -->
+            <div class="grid grid-cols-2 gap-3">
+              <div class="rounded-2xl bg-slate-50 dark:bg-zinc-800 px-4 py-3.5">
+                <p class="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-1">
+                  {{ selectedAcc.type === 'credit' ? 'Outstanding' : selectedAcc.type === 'loan' ? 'Remaining' : 'Balance' }}
+                </p>
+                <p :class="['text-[20px] font-black leading-none', displayBalance(selectedAcc) < 0 ? 'text-rose-500' : 'text-slate-900 dark:text-zinc-50']">
+                  {{ sym }}{{ formatAmount(Math.abs(displayBalance(selectedAcc))) }}
+                </p>
+              </div>
+              <div v-if="selectedAcc.type === 'credit'" class="rounded-2xl bg-slate-50 dark:bg-zinc-800 px-4 py-3.5">
+                <p class="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-1">Available</p>
+                <p class="text-[20px] font-black leading-none text-emerald-500">
+                  {{ sym }}{{ formatAmount((selectedAcc.limit ?? 0) - (selectedAcc.outstanding ?? 0)) }}
+                </p>
+              </div>
+              <div v-else-if="selectedAcc.type === 'loan'" class="rounded-2xl bg-slate-50 dark:bg-zinc-800 px-4 py-3.5">
+                <p class="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-1">Original</p>
+                <p class="text-[20px] font-black leading-none text-slate-900 dark:text-zinc-50">
+                  {{ sym }}{{ formatAmount(selectedAcc.principal ?? 0) }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Credit utilization bar -->
+            <div v-if="selectedAcc.type === 'credit'" class="rounded-2xl bg-slate-50 dark:bg-zinc-800 px-4 py-3.5">
+              <div class="flex justify-between items-center mb-2">
+                <p class="text-[12px] font-bold text-slate-500 dark:text-zinc-400">Credit Utilization</p>
+                <p class="text-[15px] font-black"
+                  :class="utilizationPct > 70 ? 'text-rose-500' : utilizationPct > 40 ? 'text-amber-500' : 'text-violet-500'">
+                  {{ utilizationPct }}%
+                </p>
+              </div>
+              <div class="h-2 bg-slate-200 dark:bg-zinc-700 rounded-full overflow-hidden mb-2">
+                <div :class="['h-full rounded-full transition-all duration-700',
+                  utilizationPct > 70 ? 'bg-rose-500' : utilizationPct > 40 ? 'bg-amber-500' : 'bg-violet-500']"
+                  :style="{ width: Math.min(100, utilizationPct) + '%' }"></div>
+              </div>
+              <p class="text-[11px] font-semibold text-slate-400 dark:text-zinc-500">Due {{ selectedAcc.due ?? '—' }}</p>
+            </div>
+
+            <!-- Recent transactions -->
+            <div>
+              <p class="text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-2">Recent Transactions</p>
+              <div class="rounded-2xl overflow-hidden bg-slate-50 dark:bg-zinc-800 border border-slate-100 dark:border-zinc-700/60">
+                <div v-if="accountTxns.length === 0" class="py-8 text-center">
+                  <p class="text-[13px] font-bold text-slate-400 dark:text-zinc-600">No transactions yet</p>
+                </div>
+                <div v-for="(tx, i) in accountTxns.slice(0, 6)" :key="tx.id"
+                  :class="['flex items-center gap-3 px-4 py-3',
+                    i < Math.min(5, accountTxns.length - 1) ? 'border-b border-slate-100 dark:border-zinc-700/60' : '']">
+                  <div class="w-9 h-9 rounded-xl bg-violet-50 dark:bg-violet-950/40 flex items-center justify-center flex-shrink-0">
+                    <component :is="tx.icon" :size="16" class="text-violet-500" :stroke-width="1.8" />
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-[13px] font-bold text-slate-800 dark:text-zinc-100 truncate">{{ tx.name }}</p>
+                    <p class="text-[10px] text-slate-400 dark:text-zinc-500 mt-0.5">{{ tx.category }} · {{ tx.date }}</p>
+                  </div>
+                  <span :class="['text-[13px] font-bold flex-shrink-0', tx.amount > 0 ? 'text-emerald-500' : 'text-slate-700 dark:text-zinc-300']">
+                    {{ tx.amount > 0 ? '+' : '−' }}{{ sym }}{{ formatAmount(Math.abs(tx.amount)) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Remove account -->
+            <button @click="selectedAcc = null; showDeleteConfirm = true"
+              class="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-rose-50 dark:bg-rose-950/30 text-rose-500 text-[13px] font-bold active:scale-[0.98] transition-all border border-rose-100 dark:border-rose-900/40">
+              <Trash2 :size="14" :stroke-width="2" /> Remove Account
+            </button>
+
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
+
   <!-- ── Delete Confirmation ── -->
   <Teleport to="body">
     <Transition name="fade">
@@ -295,28 +351,6 @@
       </div>
     </Transition>
   </Teleport>
-
-  <!-- ── NFC Modal ── -->
-  <Teleport to="body">
-    <Transition name="fade">
-      <div v-if="nfcModal" class="fixed inset-0 z-[300] flex items-center justify-center"
-        style="background:rgba(0,0,0,0.78);backdrop-filter:blur(14px)" @click.self="nfcModal = false">
-        <div class="flex flex-col items-center gap-6 p-10 text-center max-w-[320px]">
-          <div class="relative w-32 h-32 flex items-center justify-center">
-            <div class="absolute inset-0 rounded-full bg-violet-500/20 animate-ping"></div>
-            <div class="w-20 h-20 rounded-full bg-violet-500 flex items-center justify-center shadow-2xl shadow-violet-500/50">
-              <Wifi :size="36" color="white" :stroke-width="1.8" style="transform:rotate(90deg)" />
-            </div>
-          </div>
-          <div>
-            <p class="text-white text-[20px] font-black">Tap to Pay</p>
-            <p class="text-white/50 text-[13px] mt-2 leading-relaxed">Hold your phone near the payment terminal. Real NFC uses Google Pay or Samsung Pay.</p>
-          </div>
-          <button @click="nfcModal = false" class="text-white/40 text-[13px] font-semibold active:text-white/70">Dismiss</button>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -326,12 +360,12 @@ import {
   CreditCard, Landmark, Wallet, PiggyBank,
   TrendingUp, Building2, Coins, Banknote,
 } from 'lucide-vue-next'
-import { recentTx, cardsVersion, settings, orbLog } from '../composables/useStore'
+import { recentTx, cardsVersion, settings, orbLog, addTx, totalBalance, totalIncome, totalExpenses } from '../composables/useStore'
 
 const CARDS_KEY = 'orb_cards_v1'
 const sym = computed(() => settings.value.currencySymbol)
+const accent = computed(() => settings.value.accentColor)
 
-// ── Account interface ──────────────────────────────────────
 interface Account {
   id:           number
   type:         'credit' | 'debit' | 'savings' | 'investment' | 'cash' | 'prepaid' | 'atm' | 'loan'
@@ -341,28 +375,24 @@ interface Account {
   network?:     string
   gradient:     string
   nfcEnabled:   boolean
-  // credit fields
   limit?:       number
   outstanding?: number
   due?:         string
-  // asset fields (debit, savings, investment, cash, prepaid, atm)
   balance?:     number
   spent?:       number
-  // loan
   principal?:   number
   remaining?:   number
 }
 
-// ── Account type metadata ──────────────────────────────────
 const ACCOUNT_META: Record<string, { label: string; icon: any; gradient: string; sub: string }> = {
-  credit:     { label:'Credit Card',  icon:CreditCard, gradient:'linear-gradient(135deg,#1e1b4b,#3730a3)', sub:'Revolving credit line'  },
-  debit:      { label:'Debit Card',   icon:CreditCard, gradient:'linear-gradient(135deg,#0f2027,#203a43)', sub:'Linked to bank account' },
-  savings:    { label:'Savings',      icon:PiggyBank,  gradient:'linear-gradient(135deg,#065f46,#059669)', sub:'High-yield or regular'   },
-  investment: { label:'Investment',   icon:TrendingUp, gradient:'linear-gradient(135deg,#1c1917,#7c2d12)', sub:'Stocks, funds, crypto'  },
-  cash:       { label:'Cash',         icon:Banknote,   gradient:'linear-gradient(135deg,#14532d,#16a34a)', sub:'Physical cash on hand'  },
-  prepaid:    { label:'Prepaid',      icon:Wallet,     gradient:'linear-gradient(135deg,#4a044e,#86198f)', sub:'Loaded prepaid card'    },
-  atm:        { label:'ATM / Passbook',icon:Landmark,  gradient:'linear-gradient(135deg,#1e3a5f,#1d4ed8)', sub:'Traditional bank book'  },
-  loan:       { label:'Loan / Debt',  icon:Building2,  gradient:'linear-gradient(135deg,#7f1d1d,#dc2626)', sub:'Track what you owe'     },
+  credit:     { label:'Credit Card',   icon:CreditCard, gradient:'linear-gradient(135deg,#1e1b4b,#3730a3)', sub:'Revolving credit line'  },
+  debit:      { label:'Debit Card',    icon:CreditCard, gradient:'linear-gradient(135deg,#0f2027,#203a43)', sub:'Linked to bank account' },
+  savings:    { label:'Savings',       icon:PiggyBank,  gradient:'linear-gradient(135deg,#065f46,#059669)', sub:'High-yield or regular'   },
+  investment: { label:'Investment',    icon:TrendingUp, gradient:'linear-gradient(135deg,#1c1917,#7c2d12)', sub:'Stocks, funds, crypto'  },
+  cash:       { label:'Cash',          icon:Banknote,   gradient:'linear-gradient(135deg,#14532d,#16a34a)', sub:'Physical cash on hand'  },
+  prepaid:    { label:'Prepaid',       icon:Wallet,     gradient:'linear-gradient(135deg,#4a044e,#86198f)', sub:'Loaded prepaid card'    },
+  atm:        { label:'ATM / Passbook',icon:Landmark,   gradient:'linear-gradient(135deg,#1e3a5f,#1d4ed8)', sub:'Traditional bank book'  },
+  loan:       { label:'Loan / Debt',   icon:Building2,  gradient:'linear-gradient(135deg,#7f1d1d,#dc2626)', sub:'Track what you owe'     },
 }
 
 function accountTypeMeta(type: string) {
@@ -371,7 +401,6 @@ function accountTypeMeta(type: string) {
 
 const accountTypes = Object.entries(ACCOUNT_META).map(([val, m]) => ({ val, ...m }))
 
-// ── Gradients palette ──────────────────────────────────────
 const gradients = [
   'linear-gradient(135deg,#1e1b4b,#3730a3)', 'linear-gradient(135deg,#1a1a2e,#16213e)',
   'linear-gradient(135deg,#0f2027,#203a43)', 'linear-gradient(135deg,#065f46,#059669)',
@@ -381,7 +410,6 @@ const gradients = [
   'linear-gradient(135deg,#1e3a5f,#1d4ed8)', 'linear-gradient(135deg,#7f1d1d,#dc2626)',
 ]
 
-// ── Load / save ────────────────────────────────────────────
 function loadAccounts(): Account[] {
   try { const r = localStorage.getItem(CARDS_KEY); if (r) return JSON.parse(r) } catch {}
   return []
@@ -390,11 +418,10 @@ function saveAccounts(list: Account[]) {
   try { localStorage.setItem(CARDS_KEY, JSON.stringify(list)) } catch {}
 }
 
-const accounts = ref<Account[]>(loadAccounts())
+const accounts = ref<Account[]>([])
 onMounted(() => { accounts.value = loadAccounts() })
 watch(cardsVersion, () => { accounts.value = loadAccounts() })
 
-// ── Filters ────────────────────────────────────────────────
 const typeFilters = [
   { val:'all',        label:'All',         icon:Wallet      },
   { val:'credit',     label:'Credit',      icon:CreditCard  },
@@ -409,7 +436,6 @@ const filteredAccounts = computed(() =>
   activeFilter.value === 'all' ? accounts.value : accounts.value.filter(a => a.type === activeFilter.value)
 )
 
-// Group by type
 const groupedAccounts = computed(() => {
   const map = new Map<string, Account[]>()
   for (const acc of filteredAccounts.value) {
@@ -419,11 +445,19 @@ const groupedAccounts = computed(() => {
   return Array.from(map.entries()).map(([type, items]) => ({ type, items }))
 })
 
-// ── Totals ─────────────────────────────────────────────────
+// Compute per-account balance from the transaction store — not from the
+// stored acc.balance field, which gets double-counted because the initial
+// balance was recorded as a transaction AND written to acc.balance.
+function accountBalance(accId: number): number {
+  return recentTx.value
+    .filter(t => t.accountId === accId)
+    .reduce((s, t) => s + t.amount, 0)
+}
+
 function displayBalance(acc: Account): number {
-  if (acc.type === 'credit') return -(acc.outstanding ?? 0)   // liability
+  if (acc.type === 'credit') return -(acc.outstanding ?? 0)
   if (acc.type === 'loan')   return -(acc.remaining ?? acc.principal ?? 0)
-  return acc.balance ?? 0
+  return accountBalance(acc.id)
 }
 
 function balanceColor(acc: Account): string {
@@ -433,21 +467,17 @@ function balanceColor(acc: Account): string {
   return 'text-slate-800 dark:text-zinc-100'
 }
 
-const totalAssets = computed(() =>
-  accounts.value.filter(a => !['credit','loan'].includes(a.type))
-    .reduce((s, a) => s + (a.balance ?? 0), 0)
-)
-const totalLiabilities = computed(() =>
-  accounts.value.filter(a => a.type === 'credit').reduce((s, a) => s + (a.outstanding ?? 0), 0) +
-  accounts.value.filter(a => a.type === 'loan').reduce((s, a) => s + (a.remaining ?? a.principal ?? 0), 0)
-)
-const netWorth = computed(() => totalAssets.value - totalLiabilities.value)
+// Net worth = transaction-based balance (same source as home page)
+// Using totalBalance from store prevents double-counting since initial
+// balances are already recorded as income transactions via addTx().
+const netWorth      = computed(() => totalBalance.value)
+const totalAssets   = computed(() => totalIncome.value)
+const totalLiabilities = computed(() => totalExpenses.value)
 
-// ── Selected account ───────────────────────────────────────
 const selectedAcc = ref<Account | null>(null)
 
 function selectAccount(acc: Account) {
-  selectedAcc.value = selectedAcc.value?.id === acc.id ? null : acc
+  selectedAcc.value = acc
 }
 
 const accountTxns = computed(() =>
@@ -461,9 +491,6 @@ const utilizationPct = computed(() => {
   const limit = selectedAcc.value.limit ?? 1
   return Math.round(((selectedAcc.value.outstanding ?? 0) / limit) * 100)
 })
-
-// ── NFC ────────────────────────────────────────────────────
-const nfcModal = ref(false)
 
 // ── Toast ──────────────────────────────────────────────────
 const toastMsg  = ref('')
@@ -487,8 +514,10 @@ const canSubmit = computed(() => newAcc.name.trim().length > 0 && newAcc.institu
 
 function submitAdd() {
   if (!canSubmit.value) return
+
   const amount = parseFloat(newAcc.initialBalance) || 0
-  const meta   = accountTypeMeta(newAcc.type)
+  const isAsset = !['credit', 'loan'].includes(newAcc.type)
+
   const acc: Account = {
     id:          Date.now(),
     type:        newAcc.type,
@@ -496,7 +525,7 @@ function submitAdd() {
     institution: newAcc.institution.trim(),
     lastFour:    newAcc.lastFour || undefined,
     network:     newAcc.network || undefined,
-    gradient:    gradients[newAcc.gradientIdx] ?? meta.gradient,
+    gradient:    gradients[newAcc.gradientIdx] ?? accountTypeMeta(newAcc.type).gradient,
     nfcEnabled:  newAcc.nfcEnabled,
     ...(newAcc.type === 'credit'
       ? { limit: amount, outstanding: 0, due: newAcc.due || '—' }
@@ -504,13 +533,34 @@ function submitAdd() {
       ? { principal: amount, remaining: amount }
       : { balance: amount, spent: 0 }),
   }
-  accounts.value.push(acc)
-  saveAccounts(accounts.value)
+
+  // Save account
+  const list = loadAccounts()
+  list.push(acc)
+  saveAccounts(list)
+
+  // ── KEY FIX: Create income transaction for asset accounts with initial balance ──
+  if (isAsset && amount > 0) {
+    addTx({
+      name:      `Initial balance — ${acc.name}`,
+      amount:    amount,
+      category:  'Income',
+      accountId: acc.id,
+    })
+  }
+
+  // Trigger reactivity reload
   cardsVersion.value++
+
   showAddSheet.value = false
   showToast(`${acc.name} added!`)
-  orbLog(`Account added: ${acc.name} (${acc.type})`)
-  Object.assign(newAcc, { type:'debit', name:'', institution:'', lastFour:'', network:'VISA', initialBalance:'', due:'', nfcEnabled:false, gradientIdx:0 })
+  orbLog(`Account added: ${acc.name} (${acc.type})${isAsset && amount > 0 ? ` +${sym.value}${amount.toLocaleString()} balance` : ''}`)
+
+  // Reset form
+  Object.assign(newAcc, {
+    type:'debit', name:'', institution:'', lastFour:'', network:'VISA',
+    initialBalance:'', due:'', nfcEnabled:false, gradientIdx:0,
+  })
 }
 
 // ── Delete ─────────────────────────────────────────────────
@@ -519,8 +569,8 @@ const showDeleteConfirm = ref(false)
 function confirmDelete() {
   if (!selectedAcc.value) return
   const name = selectedAcc.value.name
-  accounts.value = accounts.value.filter(a => a.id !== selectedAcc.value!.id)
-  saveAccounts(accounts.value)
+  const list = loadAccounts().filter(a => a.id !== selectedAcc.value!.id)
+  saveAccounts(list)
   cardsVersion.value++
   selectedAcc.value = null
   showDeleteConfirm.value = false
@@ -536,23 +586,12 @@ function formatAmount(n: number): string {
 </script>
 
 <style scoped>
-.card-left-enter-active,.card-left-leave-active,
-.card-right-enter-active,.card-right-leave-active {
-  transition:transform .3s cubic-bezier(.35,0,.15,1),opacity .3s ease;position:absolute;inset:0;
-}
-.card-left-enter-from  { transform:translateX(100%);  opacity:0; }
-.card-left-leave-to    { transform:translateX(-100%); opacity:0; }
-.card-right-enter-from { transform:translateX(-100%); opacity:0; }
-.card-right-leave-to   { transform:translateX(100%);  opacity:0; }
-
 .sheet-enter-active,.sheet-leave-active{transition:opacity .28s ease;}
 .sheet-enter-active>div,.sheet-leave-active>div{transition:transform .32s cubic-bezier(.32,1.1,.64,1);}
 .sheet-enter-from,.sheet-leave-to{opacity:0;}
 .sheet-enter-from>div,.sheet-leave-to>div{transform:translateY(100%);}
-
 .fade-enter-active,.fade-leave-active{transition:opacity .25s ease;}
 .fade-enter-from,.fade-leave-to{opacity:0;}
-
 .toast-enter-active{transition:all .35s cubic-bezier(0.34,1.1,0.64,1);}
 .toast-leave-active{transition:all .25s ease;}
 .toast-enter-from{opacity:0;transform:translate(-50%,-20px) scale(0.92);}

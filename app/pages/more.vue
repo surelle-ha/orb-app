@@ -10,8 +10,7 @@
       <button v-for="card in navCards" :key="card.label"
         @click="navigate(card.page)"
         class="flex flex-col items-center gap-2 rounded-2xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm py-4 active:scale-95 transition-transform">
-        <div class="w-11 h-11 rounded-2xl flex items-center justify-center"
-          :style="{ background: accent + '18' }">
+        <div class="w-11 h-11 rounded-2xl flex items-center justify-center" :style="{ background: accent + '18' }">
           <component :is="card.icon" :size="20" :style="{ color: accent }" :stroke-width="1.8" />
         </div>
         <span class="text-[12px] font-bold text-slate-700 dark:text-zinc-200">{{ card.label }}</span>
@@ -25,16 +24,18 @@
     <div class="mx-4 mb-4 rounded-2xl overflow-hidden bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm">
       <button v-for="(tool, i) in tools" :key="tool.label"
         @click="navigate(tool.page)"
-        :class="['w-full flex items-center gap-3 px-4 py-3.5 text-left active:bg-slate-50 dark:active:bg-zinc-800 transition-colors',
+        :class="['w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors active:bg-slate-50 dark:active:bg-zinc-800',
           i < tools.length - 1 ? 'border-b border-slate-100 dark:border-zinc-800/60' : '']">
         <div class="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0"
-          :style="{ background: accent + '18' }">
+          :style="{ background: tool.highlight ? accent + '20' : accent + '18' }">
           <component :is="tool.icon" :size="19" :style="{ color: accent }" :stroke-width="1.8" />
         </div>
         <div class="flex-1 min-w-0">
           <p class="text-[14px] font-bold text-slate-800 dark:text-zinc-100">{{ tool.label }}</p>
           <p class="text-[11px] text-slate-400 dark:text-zinc-500 font-medium mt-0.5">{{ tool.sub }}</p>
         </div>
+        <div v-if="tool.badge" class="flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black mr-1"
+          :style="{ background: accent + '20', color: accent }">{{ tool.badge }}</div>
         <ChevronRight :size="17" class="text-slate-300 dark:text-zinc-700 flex-shrink-0" :stroke-width="2" />
       </button>
     </div>
@@ -57,17 +58,20 @@
       </button>
     </div>
 
-    <!-- Orb Finance card -->
-    <div class="mx-4 rounded-2xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm px-4 py-4 flex items-center gap-3">
+    <!-- Orb Finance card — taps to About page -->
+    <button @click="navigate('about')"
+      class="mx-4 rounded-2xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm px-4 py-4 flex items-center gap-3 active:scale-[0.98] transition-transform"
+      style="width:calc(100% - 32px)">
       <div class="relative flex-shrink-0" style="width:40px;height:40px;">
         <div class="absolute inset-0 rounded-full" :style="orbCardRing"></div>
         <div class="absolute rounded-full" :style="orbCardCore"></div>
       </div>
-      <div>
+      <div class="flex-1 text-left">
         <p class="text-[14px] font-black text-slate-800 dark:text-zinc-100">Orb Finance</p>
         <p class="text-[11px] text-slate-400 dark:text-zinc-500">Your Financial Universe · v1.0</p>
       </div>
-    </div>
+      <ChevronRight :size="15" class="text-slate-300 dark:text-zinc-700 flex-shrink-0" :stroke-width="2" />
+    </button>
 
     <div class="h-4"></div>
   </div>
@@ -77,7 +81,7 @@
 import { computed } from 'vue'
 import {
   ChevronRight, ArrowLeftRight, Settings, FlaskConical,
-  CreditCard, Zap, ShoppingCart,
+  CreditCard, Zap, ShoppingCart, User, Dice5,
 } from 'lucide-vue-next'
 import { settings } from '../composables/useStore'
 import { useNav }   from '../composables/useNav'
@@ -96,14 +100,16 @@ const orbCardCore = computed(() => ({
 }))
 
 const navCards = [
-  { icon: CreditCard,  label: 'Accounts', page: 'cards'   },
-  { icon: Zap,         label: 'Bills',    page: 'bills'   },
-  { icon: ShoppingCart,label: 'Grocery',  page: 'grocery' },
+  { icon: CreditCard,   label: 'Accounts', page: 'cards'    },
+  { icon: Zap,          label: 'Bills',    page: 'bills'    },
+  { icon: ShoppingCart, label: 'Grocery',  page: 'grocery'  },
 ]
 
 const tools = [
-  { icon: ArrowLeftRight, label: 'Transaction History', sub: 'Browse all past transactions', page: 'transactions' },
-  { icon: Settings,       label: 'Settings',            sub: 'Preferences & appearance',    page: 'settings'     },
+  { icon: User,          label: 'Profile',             sub: 'Personal info & financial details',   page: 'profile',     highlight: false, badge: null  },
+  { icon: ArrowLeftRight,label: 'Transaction History', sub: 'Browse all past transactions',        page: 'transactions',highlight: false, badge: null  },
+  { icon: Dice5,         label: 'Buy or Not to Buy?',  sub: 'AI-powered purchase decision helper', page: 'randomizer',  highlight: true,  badge: 'New' },
+  { icon: Settings,      label: 'Settings',            sub: 'Preferences & appearance',            page: 'settings',    highlight: false, badge: null  },
 ]
 </script>
 

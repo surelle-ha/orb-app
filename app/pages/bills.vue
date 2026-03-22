@@ -60,7 +60,7 @@
       <p class="text-[14px] font-bold text-slate-400 dark:text-zinc-600">No bills here</p>
     </div>
 
-    <div class="mx-4 rounded-2xl overflow-hidden bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm">
+    <div v-else class="mx-4 rounded-2xl overflow-hidden bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm">
       <div v-for="(bill, i) in filteredBills" :key="bill.id"
         :class="['flex items-center gap-3 px-4 py-3.5 transition-colors',
           i < filteredBills.length - 1 ? 'border-b border-slate-100 dark:border-zinc-800/60' : '']">
@@ -98,7 +98,7 @@
         <!-- Actions -->
         <div class="flex items-center gap-1 flex-shrink-0">
           <button v-if="bill.status !== 'paid'"
-            @click="markPaid(bill.id)"
+            @click="openPayOverlay(bill)"
             class="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center active:scale-90 transition-transform"
             title="Mark as paid">
             <Check :size="15" class="text-emerald-500" :stroke-width="2.5" />
@@ -114,6 +114,135 @@
 
     <div class="h-4"></div>
   </div>
+
+  <!-- ══════════════════════════════════════
+       PAY BILL OVERLAY
+  ══════════════════════════════════════ -->
+  <Teleport to="body">
+    <Transition name="sheet">
+      <div v-if="payTarget"
+        class="fixed inset-0 z-[200] flex items-end justify-center"
+        style="background:rgba(0,0,0,0.55);backdrop-filter:blur(8px)"
+        @click.self="payTarget = null">
+        <div class="w-full max-w-[430px] bg-white dark:bg-zinc-900 rounded-t-[28px] border-t border-slate-200/60 dark:border-zinc-800"
+          :style="{ paddingBottom:'calc(32px + env(safe-area-inset-bottom))' }">
+          <div class="flex flex-col gap-4 px-5 pt-4">
+
+            <!-- Handle -->
+            <div class="w-10 h-1 bg-slate-200 dark:bg-zinc-700 rounded-full self-center"></div>
+
+            <!-- Bill preview -->
+            <div class="flex items-center gap-3 p-3.5 rounded-2xl"
+              :style="{ background: accent + '10', border: '1px solid ' + accent + '30' }">
+              <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                :style="{ background: accent + '20' }">
+                <component :is="billIcon(payTarget.icon)" :size="18" :style="{ color: accent }" :stroke-width="1.8" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-[14px] font-black text-slate-800 dark:text-zinc-100">{{ payTarget.name }}</p>
+                <p class="text-[11px] font-semibold mt-0.5" :style="{ color: accent }">
+                  {{ sym }}{{ payTarget.amount.toLocaleString() }}
+                  <span v-if="payTarget.recurring" class="text-slate-400 dark:text-zinc-500"> · recurring monthly</span>
+                </p>
+              </div>
+            </div>
+
+            <h3 class="text-[17px] font-black text-slate-900 dark:text-zinc-50 -mt-1">
+              Which account paid this?
+            </h3>
+
+            <!-- Account list -->
+            <div v-if="savedAccounts.length === 0"
+              class="flex flex-col items-center gap-2 py-6 text-center">
+              <CreditCard :size="28" class="text-slate-300 dark:text-zinc-700" :stroke-width="1.5" />
+              <p class="text-[13px] font-bold text-slate-400 dark:text-zinc-600">No accounts yet</p>
+              <p class="text-[11px] text-slate-400 dark:text-zinc-600">Add an account in Accounts first</p>
+            </div>
+
+            <div v-else class="flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-0.5" style="-webkit-overflow-scrolling:touch;">
+              <button v-for="acc in savedAccounts" :key="acc.id"
+                @click="payForm.accountId = acc.id"
+                :class="['flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all active:scale-[0.98]',
+                  payForm.accountId === acc.id
+                    ? 'border-violet-500 bg-violet-50 dark:bg-violet-950/40'
+                    : 'border-transparent bg-slate-50 dark:bg-zinc-800']">
+                <!-- Colored dot from gradient -->
+                <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                  :style="{ background: acc.gradient }">
+                  <component :is="accountTypeIcon(acc.type)" :size="16" color="rgba(255,255,255,0.85)" :stroke-width="2" />
+                </div>
+                <div class="flex-1 text-left min-w-0">
+                  <p :class="['text-[13px] font-bold truncate',
+                    payForm.accountId === acc.id ? 'text-violet-600 dark:text-violet-300' : 'text-slate-700 dark:text-zinc-300']">
+                    {{ acc.name }}
+                  </p>
+                  <p class="text-[10px] text-slate-400 dark:text-zinc-500 mt-0.5">
+                    {{ acc.institution }}
+                    <span v-if="acc.lastFour" class="font-mono"> ···{{ acc.lastFour }}</span>
+                  </p>
+                </div>
+                <div v-if="payForm.accountId === acc.id"
+                  class="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                  :style="{ background: accent }">
+                  <Check :size="11" color="white" :stroke-width="3" />
+                </div>
+              </button>
+            </div>
+
+            <!-- Override date section -->
+            <div class="rounded-2xl border border-slate-200 dark:border-zinc-800 overflow-hidden">
+              <!-- Toggle row -->
+              <button @click="payForm.overrideDate = !payForm.overrideDate"
+                class="w-full flex items-center gap-3 px-4 py-3 active:bg-slate-50 dark:active:bg-zinc-800 transition-colors">
+                <!-- Custom checkbox -->
+                <div :class="['w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all',
+                  payForm.overrideDate
+                    ? 'border-violet-500 bg-violet-500'
+                    : 'border-slate-300 dark:border-zinc-600 bg-transparent']">
+                  <Check v-if="payForm.overrideDate" :size="11" color="white" :stroke-width="3" />
+                </div>
+                <div class="flex-1 text-left">
+                  <p class="text-[13px] font-bold text-slate-700 dark:text-zinc-300">Override transaction date</p>
+                  <p class="text-[10px] text-slate-400 dark:text-zinc-500 mt-0.5">Use if payment was made in the past</p>
+                </div>
+                <CalendarDays :size="16" class="text-slate-400 dark:text-zinc-600 flex-shrink-0" :stroke-width="1.8" />
+              </button>
+
+              <!-- Date input (shown when override checked) -->
+              <Transition name="dropdown">
+                <div v-if="payForm.overrideDate"
+                  class="px-4 pb-3 border-t border-slate-100 dark:border-zinc-800">
+                  <p class="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest pt-3 mb-2">Payment Date</p>
+                  <input
+                    v-model="payForm.dateValue"
+                    type="date"
+                    :max="todayISO"
+                    class="w-full bg-slate-50 dark:bg-zinc-800 rounded-2xl px-4 py-3 text-[14px] font-semibold text-slate-800 dark:text-zinc-100 border-2 border-transparent focus:border-violet-500 outline-none transition-colors"
+                    style="-webkit-appearance:none;"
+                  />
+                  <p v-if="payForm.dateValue && payForm.dateValue > todayISO" class="text-[11px] font-bold text-rose-500 mt-1.5 px-1">
+                    Date cannot be in the future
+                  </p>
+                </div>
+              </Transition>
+            </div>
+
+            <!-- Confirm button -->
+            <button @click="confirmPay"
+              :disabled="!canConfirmPay"
+              :class="['w-full py-4 rounded-2xl text-[16px] font-black transition-all active:scale-[0.98]',
+                canConfirmPay
+                  ? 'text-white shadow-lg'
+                  : 'bg-slate-100 dark:bg-zinc-800 text-slate-300 dark:text-zinc-600']"
+              :style="canConfirmPay ? { background: accent, boxShadow: '0 8px 24px ' + accent + '44' } : {}">
+              Confirm Payment
+            </button>
+
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 
   <!-- ── Add Bill Sheet ── -->
   <Teleport to="body">
@@ -220,16 +349,29 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, onMounted } from 'vue'
-import { Plus, Check, Trash2, Calendar, Receipt, Zap, Smartphone, Wifi, Building2, Tv2, CreditCard, MoreHorizontal, RefreshCw } from 'lucide-vue-next'
-import { bills, billIcon, addBill, markBillPaid, deleteBill, refreshBillStatuses, totalBillsDue, overdueBillsCount, settings } from '../composables/useStore'
+import { ref, computed, reactive, onMounted, watch } from 'vue'
+import {
+  Plus, Check, Trash2, Calendar, CalendarDays, Receipt,
+  Zap, Smartphone, Wifi, Building2, Tv2, CreditCard,
+  MoreHorizontal, RefreshCw, PiggyBank, Landmark, Wallet,
+  Banknote, TrendingUp,
+} from 'lucide-vue-next'
+import {
+  bills, billIcon, addBill, markBillPaid, deleteBill,
+  refreshBillStatuses, totalBillsDue, overdueBillsCount,
+  settings, addTx, cardsVersion, orbLog,
+} from '../composables/useStore'
 
-const sym = computed(() => settings.value.currencySymbol)
+const CARDS_KEY = 'orb_cards_v1'
+const sym    = computed(() => settings.value.currencySymbol)
+const accent = computed(() => settings.value.accentColor)
+
 onMounted(() => refreshBillStatuses())
 
 const pendingCount = computed(() => bills.value.filter(b => b.status === 'pending').length)
 const paidCount    = computed(() => bills.value.filter(b => b.status === 'paid').length)
 
+// ── Filters ────────────────────────────────────────────────
 const filters = [
   { val:'all',     label:'All'     },
   { val:'pending', label:'Pending' },
@@ -237,7 +379,6 @@ const filters = [
   { val:'paid',    label:'Paid'    },
 ]
 const activeFilter = ref('all')
-
 const filteredBills = computed(() =>
   activeFilter.value === 'all' ? bills.value : bills.value.filter(b => b.status === activeFilter.value)
 )
@@ -257,16 +398,107 @@ function daySuffix(d: number) {
   return ['st','nd','rd'][((d % 10) - 1)] ?? 'th'
 }
 
-function markPaid(id: number) { markBillPaid(id) }
+// ── Today's ISO date (for max on date input) ────────────────
+const todayISO = computed(() => new Date().toISOString().slice(0, 10))
 
-const deleteTarget = ref<typeof bills.value[0] | null>(null)
-function confirmDelete(bill: typeof bills.value[0]) { deleteTarget.value = bill }
+// ── Accounts ───────────────────────────────────────────────
+interface SavedAccount {
+  id:          number
+  type:        string
+  name:        string
+  institution: string
+  lastFour?:   string
+  gradient:    string
+}
+const savedAccounts = ref<SavedAccount[]>([])
+
+function loadAccounts() {
+  try {
+    const raw = localStorage.getItem(CARDS_KEY)
+    if (raw) savedAccounts.value = JSON.parse(raw)
+  } catch {}
+}
+
+onMounted(loadAccounts)
+watch(cardsVersion, loadAccounts)
+
+function accountTypeIcon(type: string) {
+  const MAP: Record<string, any> = {
+    credit:     CreditCard,
+    debit:      CreditCard,
+    savings:    PiggyBank,
+    investment: TrendingUp,
+    cash:       Banknote,
+    prepaid:    Wallet,
+    atm:        Landmark,
+    loan:       Building2,
+  }
+  return MAP[type] ?? CreditCard
+}
+
+// ── Pay overlay ────────────────────────────────────────────
+type BillItem = typeof bills.value[0]
+const payTarget = ref<BillItem | null>(null)
+
+const payForm = reactive({
+  accountId:    null as number | null,
+  overrideDate: false,
+  dateValue:    '',
+})
+
+function openPayOverlay(bill: BillItem) {
+  payTarget.value = bill
+  payForm.accountId = savedAccounts.value[0]?.id ?? null
+  payForm.overrideDate = false
+  payForm.dateValue = todayISO.value
+}
+
+const canConfirmPay = computed(() => {
+  if (!payTarget.value) return false
+  if (savedAccounts.value.length > 0 && payForm.accountId === null) return false
+  if (payForm.overrideDate) {
+    if (!payForm.dateValue) return false
+    if (payForm.dateValue > todayISO.value) return false
+  }
+  return true
+})
+
+function confirmPay() {
+  if (!payTarget.value || !canConfirmPay.value) return
+  const bill = payTarget.value
+
+  // Build ISO timestamp for the transaction
+  let txIso: string
+  if (payForm.overrideDate && payForm.dateValue) {
+    // Use the override date at noon local time so it sorts cleanly
+    txIso = new Date(payForm.dateValue + 'T12:00:00').toISOString()
+  } else {
+    txIso = new Date().toISOString()
+  }
+
+  // Record as an expense transaction
+  addTx({
+    name:      `${bill.name} — bill payment`,
+    amount:    -bill.amount,
+    category:  'Utilities',
+    accountId: payForm.accountId,
+    isoDate:   txIso,
+  })
+
+  markBillPaid(bill.id)
+  orbLog(`Bill paid: ${bill.name} via account ${payForm.accountId ?? 'cash'}`)
+  payTarget.value = null
+}
+
+// ── Delete ─────────────────────────────────────────────────
+const deleteTarget = ref<BillItem | null>(null)
+function confirmDelete(bill: BillItem) { deleteTarget.value = bill }
 function doDelete() {
   if (deleteTarget.value) deleteBill(deleteTarget.value.id)
   deleteTarget.value = null
 }
 
-// ── Add form ──────────────────────────────────────────────
+// ── Add bill form ──────────────────────────────────────────
 const showAdd  = ref(false)
 const dayError = ref('')
 const form = reactive({ name:'', amount:'', dueDay:'', icon:'other', recurring:false })
@@ -321,4 +553,7 @@ function submitAdd() {
 .sheet-enter-from>div,.sheet-leave-to>div{transform:translateY(100%);}
 .fade-enter-active,.fade-leave-active{transition:opacity .25s ease;}
 .fade-enter-from,.fade-leave-to{opacity:0;}
+.dropdown-enter-active,.dropdown-leave-active{transition:all .22s ease;overflow:hidden;}
+.dropdown-enter-from,.dropdown-leave-to{opacity:0;max-height:0;}
+.dropdown-enter-to,.dropdown-leave-from{opacity:1;max-height:200px;}
 </style>

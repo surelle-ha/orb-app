@@ -22,7 +22,7 @@
       <div class="absolute inset-0 pointer-events-none"
         :style="{ background: `radial-gradient(ellipse at 50% 30%, ${accent}38 0%, transparent 60%)` }"></div>
 
-      <!-- Top row: Orb AI hint label -->
+      <!-- Top row -->
       <div class="relative flex items-center justify-between px-5 pt-4 pb-1">
         <p class="text-[10px] font-bold text-zinc-600 uppercase tracking-[0.2em]">Total Balance</p>
         <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
@@ -32,8 +32,8 @@
         </div>
       </div>
 
-      <!-- ── CLICKABLE ORB SECTION ── -->
-      <button @click="navigate('orb')"
+      <!-- ── CLICKABLE ORB SECTION with expand animation ── -->
+      <button @click="triggerOrbExpand"
         class="relative w-full flex flex-col items-center pt-2 pb-3 active:scale-[0.97] transition-transform duration-200"
         style="cursor:pointer;">
 
@@ -88,7 +88,7 @@
             :style="{ background:accent, opacity:0.7 }"></div>
         </div>
 
-        <!-- Orb insight label (small, below orb) -->
+        <!-- Orb insight label -->
         <div class="relative mt-10 mx-5 px-3.5 py-1.5 rounded-xl text-center max-w-[260px]"
           style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);">
           <p class="text-[11px] font-medium leading-snug" style="color:rgba(255,255,255,0.55);">{{ orbInsight }}</p>
@@ -120,7 +120,7 @@
       </div>
     </div>
 
-    <!-- ═══ EMPTY STATE (no transactions) ═══ -->
+    <!-- ═══ EMPTY STATE ═══ -->
     <div v-else class="mx-4 rounded-3xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm flex flex-col items-center gap-3 py-10">
       <div class="w-14 h-14 rounded-2xl bg-violet-50 dark:bg-violet-950/40 flex items-center justify-center">
         <Wallet :size="24" class="text-violet-400" :stroke-width="1.5" />
@@ -148,9 +148,10 @@
       </button>
     </div>
 
-    <!-- ═══ SPENDING (real data) ═══ -->
+    <!-- ═══ SPENDING — Horizontal Bar Chart ═══ -->
     <div class="flex items-center justify-between px-5 pt-5 pb-2">
       <h3 class="text-[13px] font-bold text-slate-500 dark:text-zinc-400">Spending</h3>
+      <span v-if="spendingByCategory.length > 0" class="text-[11px] font-semibold text-slate-400 dark:text-zinc-600">{{ sym }}{{ formatAmount(totalExpenses) }} total</span>
     </div>
 
     <!-- Empty spending state -->
@@ -160,31 +161,47 @@
       <p class="text-[13px] font-bold text-slate-400 dark:text-zinc-600">No expenses logged yet</p>
     </div>
 
-    <!-- Spending card -->
+    <!-- Horizontal bar chart card -->
     <div v-else class="mx-4 rounded-2xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm p-4">
-      <!-- Bar chart -->
-      <div class="flex items-end gap-1.5 mb-4" style="height:72px">
-        <div v-for="bar in chartBars" :key="bar.label"
-          class="flex flex-col items-center gap-1.5 flex-1 h-full justify-end">
-          <div class="w-full bg-slate-100 dark:bg-zinc-800 rounded-lg overflow-hidden flex items-end" style="height:56px">
-            <div class="w-full rounded-lg bg-violet-500 transition-all duration-700"
-              :style="{ height: bar.pct + '%', opacity: bar.opacity }"></div>
+      <div class="space-y-3">
+        <div v-for="(bar, idx) in horizontalBars" :key="bar.label" class="flex items-center gap-3">
+          <!-- Category icon dot -->
+          <div class="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0"
+            :style="{ background: accent + '18' }">
+            <component :is="bar.icon" :size="14" :style="{ color: accent }" :stroke-width="2" />
           </div>
-          <span class="text-[9px] font-semibold text-slate-400 dark:text-zinc-600 truncate w-full text-center">{{ bar.label }}</span>
+          <!-- Label + bar + amount -->
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-[12px] font-bold text-slate-600 dark:text-zinc-300 truncate">{{ bar.label }}</span>
+              <span class="text-[12px] font-black text-slate-800 dark:text-zinc-100 ml-2 flex-shrink-0">{{ sym }}{{ bar.total.toLocaleString() }}</span>
+            </div>
+            <div class="h-2 bg-slate-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+              <div class="h-full rounded-full transition-all duration-700"
+                :style="{
+                  width: bar.pct + '%',
+                  background: idx === 0
+                    ? accent
+                    : `rgba(${hexToRgbStr(accent)},${Math.max(0.35, 1 - idx * 0.15)})`,
+                }"></div>
+            </div>
+          </div>
         </div>
-      </div>
-      <!-- Category breakdown -->
-      <div class="space-y-2 pt-3 border-t border-slate-100 dark:border-zinc-800">
-        <div v-for="(cat, idx) in topSpend" :key="cat.category" class="flex items-center gap-2.5">
-          <div class="w-2 h-2 rounded-full bg-violet-500 flex-shrink-0"
-            :style="{ opacity: idx === 0 ? 1 : idx === 1 ? 0.65 : 0.4 }"></div>
-          <span class="flex-1 text-[13px] font-semibold text-slate-500 dark:text-zinc-400">{{ cat.category }}</span>
-          <span class="text-[13px] font-bold text-slate-800 dark:text-zinc-200">{{ sym }}{{ cat.total.toLocaleString() }}</span>
-        </div>
-        <div v-if="otherTotal > 0" class="flex items-center gap-2.5">
-          <div class="w-2 h-2 rounded-full bg-violet-500 flex-shrink-0" style="opacity:0.2"></div>
-          <span class="flex-1 text-[13px] font-semibold text-slate-500 dark:text-zinc-400">Other</span>
-          <span class="text-[13px] font-bold text-slate-800 dark:text-zinc-200">{{ sym }}{{ otherTotal.toLocaleString() }}</span>
+        <!-- "Other" row if any -->
+        <div v-if="otherTotal > 0" class="flex items-center gap-3">
+          <div class="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 bg-slate-100 dark:bg-zinc-800">
+            <MoreHorizontal :size="14" class="text-slate-400 dark:text-zinc-600" :stroke-width="2" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-[12px] font-bold text-slate-500 dark:text-zinc-400">Other</span>
+              <span class="text-[12px] font-black text-slate-700 dark:text-zinc-200 ml-2">{{ sym }}{{ otherTotal.toLocaleString() }}</span>
+            </div>
+            <div class="h-2 bg-slate-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+              <div class="h-full rounded-full bg-slate-200 dark:bg-zinc-700 transition-all duration-700"
+                :style="{ width: otherPct + '%' }"></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -195,8 +212,6 @@
       <span class="text-[11px] font-semibold text-slate-400 dark:text-zinc-600">Last 15 weeks</span>
     </div>
     <div class="mx-4 rounded-2xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm p-4">
-
-      <!-- Month labels row -->
       <div class="relative mb-1.5" :style="{ height: '14px', display: 'grid', gridTemplateColumns: `repeat(${HEATMAP_WEEKS}, 1fr)` }">
         <template v-for="lbl in heatmapMonthLabels" :key="lbl.col">
           <span class="text-[9px] font-bold text-slate-400 dark:text-zinc-600 absolute"
@@ -205,10 +220,7 @@
           </span>
         </template>
       </div>
-
-      <!-- Grid: day-label col + 15-week columns -->
       <div class="flex gap-[3px] items-start">
-        <!-- Day-of-week labels -->
         <div class="flex flex-col gap-[3px] mr-1 flex-shrink-0">
           <span v-for="(lbl, i) in heatmapDayLabels" :key="i"
             class="text-[9px] font-bold text-slate-300 dark:text-zinc-700 leading-none"
@@ -216,25 +228,20 @@
             {{ i % 2 === 0 ? lbl : '' }}
           </span>
         </div>
-
-        <!-- Week columns -->
         <div class="flex gap-[3px] flex-1 overflow-hidden">
           <div v-for="w in HEATMAP_WEEKS" :key="w" class="flex flex-col gap-[3px] flex-1">
             <div
               v-for="day in 7" :key="day"
-              :class="'rounded-[3px] flex-shrink-0'"
+              class="rounded-[3px] flex-shrink-0"
               style="height:12px;"
               :style="{
                 backgroundColor: cellColor(heatmapData[(w-1)*7+(day-1)].intensity, heatmapData[(w-1)*7+(day-1)].isFuture, heatmapData[(w-1)*7+(day-1)].hasExpense, heatmapData[(w-1)*7+(day-1)].hasIncome),
                 boxShadow: heatmapData[(w-1)*7+(day-1)].isToday ? `0 0 0 1.5px ${settings.accentColor}` : 'none',
               }"
-              :title="`${heatmapData[(w-1)*7+(day-1)].key}: ${heatmapData[(w-1)*7+(day-1)].count} txn(s)`"
             />
           </div>
         </div>
       </div>
-
-      <!-- Legend -->
       <div class="flex items-center gap-3 mt-3 pt-2.5 border-t border-slate-100 dark:border-zinc-800">
         <span class="text-[10px] font-semibold text-slate-400 dark:text-zinc-600">Less</span>
         <div class="flex gap-1">
@@ -287,8 +294,20 @@
     </div>
 
     <div class="h-4"></div>
-
   </div>
+
+  <!-- ═══ ORB EXPAND OVERLAY ═══ -->
+  <Teleport to="body">
+    <Transition name="orb-expand">
+      <div v-if="orbExpanding"
+        class="fixed inset-0 z-[9998] flex items-center justify-center pointer-events-none"
+        :style="{ background: `radial-gradient(circle at 50% 50%, ${accent}FF 0%, ${accent}EE 15%, ${accent}CC 35%, #09090b 75%)` }">
+        <div class="w-32 h-32 rounded-full"
+          :style="{ background: `radial-gradient(circle at 38% 32%, #1a1a2e 0%, #000 100%)`, boxShadow: `0 0 80px 30px ${accent}88` }">
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -296,20 +315,20 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import {
   Eye, EyeOff, TrendingUp, TrendingDown,
   CreditCard, ShoppingCart, Zap, BarChart2,
-  ChevronRight, ArrowLeftRight, Wallet, Plus,
+  ChevronRight, ArrowLeftRight, Wallet, Plus, MoreHorizontal,
+  Utensils, ShoppingBag, Car, Gamepad2, Banknote,
 } from 'lucide-vue-next'
 import { useNav }   from '../composables/useNav'
 import {
   recentTx, quickAddOpen,
   totalBalance, totalIncome, totalExpenses,
   spendingByCategory, transactions,
-  settings,
+  settings, CATEGORY_ICONS,
 } from '../composables/useStore'
 
 const { navigate } = useNav()
 
 const currentHour = ref(new Date().getHours())
-// Update greeting every minute so it stays accurate
 let greetingTimer: ReturnType<typeof setInterval> | null = null
 onMounted(() => {
   greetingTimer = setInterval(() => { currentHour.value = new Date().getHours() }, 60_000)
@@ -329,7 +348,23 @@ const accent      = computed(() => settings.value.accentColor)
 const userName    = computed(() => settings.value.userName || 'You')
 const userInitial = computed(() => (settings.value.userName || 'O').charAt(0).toUpperCase())
 
-// ── Accent-driven style objects (avoids backticks in templates) ──
+// ── Orb expand animation ──────────────────────────────────
+const orbExpanding = ref(false)
+
+async function triggerOrbExpand() {
+  orbExpanding.value = true
+  await new Promise(r => setTimeout(r, 680))
+  orbExpanding.value = false
+  navigate('orb')
+}
+
+// ── Accent helpers ─────────────────────────────────────────
+function hexToRgbStr(hex: string): string {
+  const h = hex.replace('#','')
+  return `${parseInt(h.slice(0,2),16)},${parseInt(h.slice(2,4),16)},${parseInt(h.slice(4,6),16)}`
+}
+
+// ── Accent-driven style objects ────────────────────────────
 const discGlowBack  = computed(() => ({
   width:'230px', height:'44px', marginLeft:'-115px', marginTop:'-22px',
   background:`radial-gradient(ellipse, ${accent.value}24 0%, transparent 70%)`,
@@ -353,12 +388,6 @@ const orbLensRing   = computed(() => ({
 const orbSphereShadow = computed(() => ({
   background:'radial-gradient(circle at 38% 32%,#1a1a2e 0%,#09090b 45%,#000 100%)',
   boxShadow:`inset 0 0 22px rgba(0,0,0,1), 0 0 0 1px ${accent.value}59`,
-}))
-const miniRing2   = computed(() => ({ inset:'4px',  border:`0.5px solid ${accent.value}4D` }))
-const miniRing3   = computed(() => ({ inset:'9px',  border:`0.5px solid ${accent.value}26` }))
-const miniOrbGlow = computed(() => ({
-  inset:'10px',
-  boxShadow:`0 0 16px 4px ${accent.value}80, 0 0 32px 8px ${accent.value}40`,
 }))
 
 function formatAmount(n: number): string {
@@ -387,13 +416,10 @@ function initStarfield(canvas: HTMLCanvasElement) {
   ctx.scale(dpr, dpr)
 
   const stars: Star[] = Array.from({ length: 90 }, () => ({
-    x:  Math.random() * W,
-    y:  Math.random() * H,
-    r:  Math.random() * 1.2 + 0.2,
-    a:  Math.random(),
+    x:  Math.random() * W, y:  Math.random() * H,
+    r:  Math.random() * 1.2 + 0.2, a:  Math.random(),
     da: (Math.random() * 0.004 + 0.001) * (Math.random() > 0.5 ? 1 : -1),
-    dx: (Math.random() - 0.5) * 0.06,
-    dy: (Math.random() - 0.5) * 0.06,
+    dx: (Math.random() - 0.5) * 0.06, dy: (Math.random() - 0.5) * 0.06,
   }))
 
   function draw() {
@@ -414,24 +440,16 @@ function initStarfield(canvas: HTMLCanvasElement) {
 }
 
 onMounted(() => {
-  // nextTick ensures Vue has flushed the DOM, then rAF waits for the browser
-  // to complete its first layout paint so clientWidth/Height are non-zero.
   nextTick(() => {
     requestAnimationFrame(() => {
       const canvas = starsCanvas.value
       if (!canvas) return
-      if (canvas.clientWidth > 0) {
-        initStarfield(canvas)
-        return
-      }
-      // Fallback: ResizeObserver fires once real dimensions arrive
+      if (canvas.clientWidth > 0) { initStarfield(canvas); return }
       starsRO = new ResizeObserver((entries) => {
         for (const e of entries) {
           if (e.contentRect.width > 0) {
-            starsRO!.disconnect()
-            starsRO = null
-            initStarfield(canvas)
-            break
+            starsRO!.disconnect(); starsRO = null
+            initStarfield(canvas); break
           }
         }
       })
@@ -439,37 +457,38 @@ onMounted(() => {
     })
   })
 })
-onUnmounted(() => {
-  cancelAnimationFrame(animFrame)
-  starsRO?.disconnect()
-})
+onUnmounted(() => { cancelAnimationFrame(animFrame); starsRO?.disconnect() })
 
-// ── Spending data ─────────────────────────────────────────
-const TOP_N = 3
+// ── Horizontal bar chart data ─────────────────────────────
+const ICON_MAP: Record<string, any> = {
+  Food: Utensils, Groceries: ShoppingBag, Transport: Car,
+  Utilities: Zap, Shopping: ShoppingCart, Leisure: Gamepad2,
+  Income: Banknote, Other: MoreHorizontal,
+}
+
+const TOP_N = 5
 const topSpend = computed(() => spendingByCategory.value.slice(0, TOP_N))
 const otherTotal = computed(() =>
   spendingByCategory.value.slice(TOP_N).reduce((s, c) => s + c.total, 0)
 )
+const grandTotal = computed(() => spendingByCategory.value.reduce((s, c) => s + c.total, 0))
+const otherPct = computed(() =>
+  grandTotal.value > 0 ? Math.round((otherTotal.value / grandTotal.value) * 100) : 0
+)
 
-const chartBars = computed(() => {
-  const cats = spendingByCategory.value.slice(0, 7)
-  if (cats.length === 0) return []
-  const maxVal = cats[0].total
-  return cats.map((c, i) => ({
-    label:   c.category,
-    pct:     maxVal > 0 ? Math.max(6, Math.round((c.total / maxVal) * 100)) : 0,
-    opacity: i === 0 ? 1 : Math.max(0.3, 1 - i * 0.12),
+const horizontalBars = computed(() =>
+  topSpend.value.map(c => ({
+    label: c.category,
+    total: c.total,
+    icon:  ICON_MAP[c.category] ?? MoreHorizontal,
+    pct:   grandTotal.value > 0 ? Math.max(3, Math.round((c.total / grandTotal.value) * 100)) : 0,
   }))
-})
+)
 
 // ── Heatmap colour helpers ─────────────────────────────────
 function hexToRgb(hex: string): [number,number,number] {
   const h = hex.replace('#','')
-  return [
-    parseInt(h.slice(0,2),16),
-    parseInt(h.slice(2,4),16),
-    parseInt(h.slice(4,6),16),
-  ]
+  return [ parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16) ]
 }
 function cellColor(intensity: number, isFuture: boolean, hasExpense: boolean, hasIncome: boolean): string {
   const dark = document.documentElement.classList.contains('dark')
@@ -489,7 +508,7 @@ function legendColor(step: number): string {
   return `rgba(${r},${g},${b},${alpha})`
 }
 
-// ── Activity Heatmap (15 weeks × 7 days) ──────────────────
+// ── Activity Heatmap ───────────────────────────────────────
 const HEATMAP_WEEKS = 15
 const heatmapData = computed(() => {
   type DayData = { income: number; expense: number; count: number }
@@ -504,7 +523,7 @@ const heatmapData = computed(() => {
   }
   const today = new Date(); today.setHours(0,0,0,0)
   const todayKey = today.toISOString().slice(0,10)
-  const dow   = (today.getDay() + 6) % 7   // 0=Mon
+  const dow   = (today.getDay() + 6) % 7
   const anchor = new Date(today); anchor.setDate(anchor.getDate() - dow)
   const start  = new Date(anchor); start.setDate(start.getDate() - (HEATMAP_WEEKS - 1) * 7)
   let maxTotal = 0
@@ -554,7 +573,7 @@ const quickActions = [
   { icon: BarChart2,    label: 'More',     fn: () => navigate('more')     },
 ]
 
-// ── Orb insight (speech bubble on balance card) ───────────
+// ── Orb insight ───────────────────────────────────────────
 const orbInsight = computed(() => {
   if (recentTx.value.length === 0)
     return 'Add your first transaction to get started.'
@@ -569,14 +588,25 @@ const orbInsight = computed(() => {
 </script>
 
 <style>
+/* ── Orb expand animation ─────────────────────────────── */
+.orb-expand-enter-active {
+  animation: orb-burst 0.65s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.orb-expand-leave-active {
+  transition: opacity 0.2s ease;
+}
+.orb-expand-leave-to { opacity: 0; }
+
+@keyframes orb-burst {
+  0%   { transform: scale(0.05); opacity: 0.8; }
+  60%  { transform: scale(1.4);  opacity: 1;   }
+  100% { transform: scale(3);    opacity: 1;   }
+}
+
 /* ── Horizon orbit ring spin ─────────────────────────── */
 @keyframes orb-h-spin-cw  { from{transform:rotate(0deg)}   to{transform:rotate(360deg)}  }
 @keyframes orb-h-spin-ccw { from{transform:rotate(0deg)}   to{transform:rotate(-360deg)} }
 
-/*
-  Particles travel an elliptical orbit: rx≈72px, ry≈12px (matching ring-1).
-  opacity fades at the back half (25%–75%) to sell depth.
-*/
 @keyframes orb-h-orbit-1 {
   0%   { transform:rotate(0deg)   translate(72px,0) rotate(0deg);    opacity:0.95; }
   24%  { opacity:0.9; }
@@ -596,37 +626,12 @@ const orbInsight = computed(() => {
   100% { transform:rotate(540deg) translate(90px,0) rotate(-540deg); opacity:0.7;  }
 }
 
-/* SVG arcs rotate in place — spin-cw / spin-ccw applied as class */
 .orb-h-ring-1 { animation:orb-h-spin-cw  14s linear infinite; transform-origin:72px 12px; }
 .orb-h-ring-2 { animation:orb-h-spin-ccw 22s linear infinite; transform-origin:100px 18px; }
 .orb-h-ring-3 { animation:orb-h-spin-cw  35s linear infinite; transform-origin:127px 26px; }
 .orb-h-ring-4 { animation:orb-h-spin-ccw 50s linear infinite; transform-origin:155px 34px; }
 .orb-h-p1     { animation:orb-h-orbit-1   4s  linear infinite; }
 .orb-h-p2     { animation:orb-h-orbit-2   7s  linear infinite; }
-
-/* ── Mini-orb in AI panel ───────────────────────────── */
-@keyframes orb-spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
-.orb-ring-1 { animation:orb-spin  8s linear infinite; }
-.orb-ring-2 { animation:orb-spin 12s linear infinite reverse; }
-.orb-ring-3 { animation:orb-spin 18s linear infinite; }
-@keyframes orb-orbit-p1 {
-  0%  {transform:rotate(0deg)   translateX(20px) rotate(0deg);}
-  100%{transform:rotate(360deg) translateX(20px) rotate(-360deg);}
-}
-@keyframes orb-orbit-p2 {
-  0%  {transform:rotate(140deg) translateX(26px) rotate(-140deg);}
-  100%{transform:rotate(500deg) translateX(26px) rotate(-500deg);}
-}
-.orb-p1 { animation:orb-orbit-p1 4s   linear infinite; }
-.orb-p2 { animation:orb-orbit-p2 6.5s linear infinite; }
-
-@keyframes orb-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }
-.orb-pulse { animation:orb-pulse 2s ease-in-out infinite; }
-
-@keyframes dot-bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-5px)} }
-.orb-dot1 { animation:dot-bounce 1.2s ease-in-out infinite; }
-.orb-dot2 { animation:dot-bounce 1.2s ease-in-out infinite 0.15s; }
-.orb-dot3 { animation:dot-bounce 1.2s ease-in-out infinite 0.3s; }
 
 .fade-enter-active,.fade-leave-active{transition:opacity .3s ease;}
 .fade-enter-from,.fade-leave-to{opacity:0;}

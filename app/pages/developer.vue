@@ -66,14 +66,14 @@
           <p class="text-[11px] text-slate-400 dark:text-zinc-500 mt-0.5">Copy log to clipboard</p>
         </div>
       </button>
-      <button @click="appLogs.splice(0)"
+      <button @click="clearLogs"
         class="w-full flex items-center gap-3 px-4 py-3.5 border-b border-slate-100 dark:border-zinc-800/60 active:bg-slate-50 dark:active:bg-zinc-800 transition-colors">
         <div class="w-11 h-11 rounded-2xl bg-slate-100 dark:bg-zinc-800 flex items-center justify-center flex-shrink-0">
           <Trash2 :size="19" class="text-slate-500 dark:text-zinc-400" :stroke-width="1.8" />
         </div>
         <div class="flex-1 min-w-0">
           <p class="text-[14px] font-bold text-slate-800 dark:text-zinc-100">Clear Logs</p>
-          <p class="text-[11px] text-slate-400 dark:text-zinc-500 mt-0.5">{{ appLogs.length }} entries in memory</p>
+          <p class="text-[11px] text-slate-400 dark:text-zinc-500 mt-0.5">{{ persistedLogs.length }} entries stored</p>
         </div>
       </button>
       <!-- Idle lock test -->
@@ -104,18 +104,21 @@
       </button>
     </div>
 
-  <!-- Orbit Recap overlay -->
-  <OrbitRecap :visible="showRecap" @close="showRecap = false" />
+    <!-- Orbit Recap overlay -->
+    <OrbitRecap :visible="showRecap" @close="showRecap = false" />
 
-    <!-- Live log -->
+    <!-- Live log — persistent -->
     <div class="px-5 pb-2 flex items-center justify-between">
       <h3 class="text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Live Log</h3>
-      <span class="text-[10px] font-bold text-violet-500">{{ appLogs.length }} entries</span>
+      <div class="flex items-center gap-2">
+        <span class="text-[10px] font-bold text-violet-500">{{ persistedLogs.length }} entries</span>
+        <span class="text-[10px] font-bold text-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded-full">Persistent</span>
+      </div>
     </div>
     <div class="mx-4 mb-4 rounded-2xl bg-zinc-950 border border-zinc-800 overflow-hidden">
-      <div class="max-h-56 overflow-y-auto p-3 space-y-1" style="-webkit-overflow-scrolling:touch;">
-        <div v-if="appLogs.length === 0" class="text-zinc-600 text-[11px] font-mono py-2 text-center">No logs yet</div>
-        <div v-for="(log, i) in appLogs" :key="i" class="flex items-start gap-2 text-[10px] font-mono leading-relaxed">
+      <div class="max-h-64 overflow-y-auto p-3 space-y-1" style="-webkit-overflow-scrolling:touch;">
+        <div v-if="persistedLogs.length === 0" class="text-zinc-600 text-[11px] font-mono py-2 text-center">No logs yet</div>
+        <div v-for="(log, i) in persistedLogs" :key="i" class="flex items-start gap-2 text-[10px] font-mono leading-relaxed">
           <span class="text-zinc-600 flex-shrink-0">{{ log.ts }}</span>
           <span :class="['flex-shrink-0 uppercase font-bold w-8',
             log.level==='error'?'text-rose-400':log.level==='warn'?'text-amber-400':'text-emerald-400']">{{ log.level }}</span>
@@ -127,7 +130,6 @@
     <div v-if="resetOutput.length" class="mx-4 mb-4 rounded-2xl bg-zinc-950 border border-zinc-800 p-3">
       <p v-for="line in resetOutput" :key="line" class="text-[10px] font-mono text-emerald-400 leading-relaxed">{{ line }}</p>
     </div>
-
   </div>
 
   <!-- ── Storage Inspector Modal ── -->
@@ -146,7 +148,6 @@
             <p class="text-[10px] font-mono text-zinc-500 mt-0.5">{{ inspector.key }} · {{ inspector.size }}</p>
           </div>
           <div class="flex items-center gap-2">
-            <!-- View toggle -->
             <div class="flex bg-zinc-800 rounded-xl p-0.5 gap-0.5">
               <button v-for="v in (['pretty','raw'] as const)" :key="v"
                 @click="inspectorView = v"
@@ -163,11 +164,7 @@
 
         <!-- Inspector content -->
         <div class="flex-1 overflow-y-auto px-4 pb-6" style="-webkit-overflow-scrolling:touch;">
-
-          <!-- PRETTY view: structured cards per entry -->
           <div v-if="inspectorView === 'pretty'">
-
-            <!-- Transactions pretty view -->
             <div v-if="inspector.parsedType === 'transactions'" class="space-y-2">
               <div v-if="!inspector.parsed?.length" class="text-zinc-500 text-[13px] font-mono text-center py-8">Empty</div>
               <div v-for="(tx, i) in inspector.parsed" :key="tx.id ?? i"
@@ -187,8 +184,6 @@
                 </div>
               </div>
             </div>
-
-            <!-- Accounts/cards pretty view -->
             <div v-else-if="inspector.parsedType === 'accounts'" class="space-y-2">
               <div v-if="!inspector.parsed?.length" class="text-zinc-500 text-[13px] font-mono text-center py-8">Empty</div>
               <div v-for="(acc, i) in inspector.parsed" :key="acc.id ?? i"
@@ -205,8 +200,6 @@
                 </div>
               </div>
             </div>
-
-            <!-- Settings pretty view -->
             <div v-else-if="inspector.parsedType === 'settings'"
               class="rounded-2xl bg-zinc-900 border border-zinc-800 px-4 py-3 space-y-2">
               <div v-if="!inspector.parsed" class="text-zinc-500 text-[13px] font-mono text-center py-4">Empty</div>
@@ -216,20 +209,14 @@
                 <span class="text-[12px] font-mono text-violet-300">{{ String(val) }}</span>
               </div>
             </div>
-
-            <!-- Generic key-value pretty view -->
             <div v-else class="rounded-2xl bg-zinc-900 border border-zinc-800 px-4 py-3">
               <p class="text-[12px] font-mono text-zinc-300">{{ inspector.raw }}</p>
             </div>
-
           </div>
-
-          <!-- RAW view: syntax-highlighted JSON -->
           <div v-else class="rounded-2xl bg-zinc-950 border border-zinc-800 p-3">
             <div class="flex items-center justify-between mb-2">
               <span class="text-[10px] font-bold text-zinc-600 uppercase">Raw JSON</span>
-              <button @click="copyRaw"
-                class="flex items-center gap-1 text-[10px] font-bold text-violet-400 active:opacity-60">
+              <button @click="copyRaw" class="flex items-center gap-1 text-[10px] font-bold text-violet-400 active:opacity-60">
                 <Copy :size="11" :stroke-width="2" /> Copy
               </button>
             </div>
@@ -242,7 +229,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import {
   ChevronLeft, ChevronRight, RotateCcw, Download, Trash2, X,
   CreditCard, ArrowLeftRight, Settings2, Key, Copy, Lock, Sparkles,
@@ -262,6 +249,59 @@ const showRecap   = ref(false)
 
 const idleLockEnabled = computed(() => settings.value.idleLockEnabled)
 const idleLockMinutes = computed(() => settings.value.idleLockMinutes)
+
+// ── Persistent logs ────────────────────────────────────────
+const LOGS_STORAGE_KEY = 'orb_dev_logs_v1'
+const MAX_PERSISTED = 500
+
+interface PersistedLog { ts: string; level: 'info'|'warn'|'error'; msg: string }
+const persistedLogs = ref<PersistedLog[]>([])
+
+function loadPersistedLogs() {
+  try {
+    const raw = localStorage.getItem(LOGS_STORAGE_KEY)
+    if (raw) persistedLogs.value = JSON.parse(raw)
+  } catch {}
+}
+
+function savePersistedLogs() {
+  try {
+    localStorage.setItem(LOGS_STORAGE_KEY, JSON.stringify(persistedLogs.value))
+  } catch {}
+}
+
+function appendToPersistedLogs(newLogs: typeof appLogs.value) {
+  if (!newLogs.length) return
+  // Prepend new entries (newest first)
+  const combined = [...newLogs, ...persistedLogs.value]
+  // Deduplicate by ts+msg
+  const seen = new Set<string>()
+  const deduped = combined.filter(l => {
+    const key = l.ts + l.msg
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+  persistedLogs.value = deduped.slice(0, MAX_PERSISTED)
+  savePersistedLogs()
+}
+
+// Watch in-memory logs and persist any new ones
+watch(appLogs, (logs) => {
+  appendToPersistedLogs(logs)
+}, { deep: true })
+
+onMounted(() => {
+  loadPersistedLogs()
+  // Also merge any in-memory logs that might not be persisted yet
+  appendToPersistedLogs(appLogs.value)
+})
+
+function clearLogs() {
+  persistedLogs.value = []
+  appLogs.value.splice(0)
+  savePersistedLogs()
+}
 
 function testIdleLock() {
   orbLog('Dev: idle lock triggered manually')
@@ -306,10 +346,7 @@ const inspector     = ref<InspectorData | null>(null)
 const inspectorView = ref<'pretty'|'raw'>('pretty')
 
 function openInspector(row: ReturnType<typeof getStorageRow>) {
-  if (!row.raw) {
-    orbLog(`Inspector: ${row.label} is empty`)
-    return
-  }
+  if (!row.raw) { orbLog(`Inspector: ${row.label} is empty`); return }
   let parsed: any = null
   let parsedType  = row.type
   let prettyRaw   = row.raw
@@ -322,8 +359,7 @@ function openInspector(row: ReturnType<typeof getStorageRow>) {
   }
   inspector.value = {
     key: row.key, label: row.label, size: row.size,
-    raw: row.raw, prettyRaw,
-    parsedType, parsed,
+    raw: row.raw, prettyRaw, parsedType, parsed,
   }
   inspectorView.value = 'pretty'
   orbLog(`Inspector opened: ${row.label}`)
@@ -349,7 +385,7 @@ async function handleReset() {
 }
 
 function exportLogs() {
-  const txt = appLogs.value.map(l => `[${l.ts}] ${l.level.toUpperCase()} ${l.msg}`).join('\n')
+  const txt = persistedLogs.value.map(l => `[${l.ts}] ${l.level.toUpperCase()} ${l.msg}`).join('\n')
   navigator.clipboard?.writeText(txt)
     .then(() => orbLog('Logs copied to clipboard'))
     .catch(() => orbLog('Clipboard copy failed', 'warn'))

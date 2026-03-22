@@ -134,8 +134,8 @@ export const recentTx = computed(() =>
     .map(t => ({ ...t, icon: iconForCategory(t.category, t.amount) }))
 )
 
-export function addTx(tx: { name:string; amount:number; category:string; accountId?:number|null }) {
-  const iso = new Date().toISOString()
+export function addTx(tx: { name:string; amount:number; category:string; accountId?:number|null; isoDate?:string }) {
+  const iso = tx.isoDate ?? new Date().toISOString()
   const entry: Tx = {
     id: Date.now(), name: tx.name, amount: tx.amount,
     category: tx.category, accountId: tx.accountId ?? null,
