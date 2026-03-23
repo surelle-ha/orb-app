@@ -3,9 +3,8 @@ name: Build APK
 on:
   push:
     tags:
-      - 'v*'           # triggers on v1.0.0, v1.2.3-beta, etc.
+      - 'v*'
 
-# Only one build at a time per tag
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: false
@@ -21,20 +20,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0          # needed so versionCode can count commits
+          fetch-depth: 0
 
       # ── 2. Parse tag version ─────────────────────────────────────────────
       - name: Extract version from tag
         id: version
         run: |
-          TAG="${GITHUB_REF#refs/tags/}"          # e.g. v1.2.3
-          VERSION="${TAG#v}"                       # e.g. 1.2.3
-          # versionCode = total commit count (always incrementing)
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
           CODE=$(git rev-list --count HEAD)
           echo "tag=$TAG"         >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "code=$CODE"       >> $GITHUB_OUTPUT
-          echo "::notice::Building $TAG  |  versionName=$VERSION  |  versionCode=$CODE"
+          echo "::notice::Building $TAG | versionName=$VERSION | versionCode=$CODE"
 
       # ── 3. Node.js + pnpm ────────────────────────────────────────────────
       - name: Set up pnpm
@@ -52,7 +50,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # ── 4. Build Nuxt web assets ─────────────────────────────────────────
-      - name: Build Nuxt (nuxt generate)
+      - name: Build Nuxt
         run: pnpm generate
         env:
           NODE_ENV: production
@@ -72,37 +70,98 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # ── 7. Inject version into build.gradle ──────────────────────────────
+      # ── 7. Patch Java 17 sourceCompatibility ─────────────────────────────
+      - name: Patch Java sourceCompatibility
+        run: |
+          python3 - << 'PYEOF'
+          import re, pathlib, os
+
+          COMPAT_BLOCK = """
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }"""
+
+          def patch_build_gradle(path):
+              p = pathlib.Path(path)
+              if not p.exists():
+                  print(f"  skip (not found): {path}")
+                  return
+              text = p.read_text()
+              if "sourceCompatibility" in text:
+                  print(f"  already patched: {path}")
+                  return
+              # Insert compileOptions block right after the first "android {" line
+              patched = re.sub(
+                  r'(android\s*\{)',
+                  r'\1' + COMPAT_BLOCK,
+                  text,
+                  count=1
+              )
+              if patched == text:
+                  print(f"  WARNING: no 'android {{' found in {path}")
+              else:
+                  p.write_text(patched)
+                  print(f"  patched: {path}")
+
+          # Patch all relevant build.gradle files
+          targets = [
+              "android/app/build.gradle",
+              "android/capacitor-android/build.gradle",
+          ]
+          # Also find any other capacitor plugin build.gradle files
+          for root, dirs, files in os.walk("android"):
+              # skip .gradle cache dirs
+              dirs[:] = [d for d in dirs if d not in ['.gradle', 'build', '.cxx']]
+              for f in files:
+                  if f == "build.gradle":
+                      full = os.path.join(root, f)
+                      if full not in targets:
+                          targets.append(full)
+
+          for t in targets:
+              patch_build_gradle(t)
+          PYEOF
+
+      # ── 8. Patch versionCode / versionName ───────────────────────────────
       - name: Patch versionCode / versionName
         run: |
-          sed -i \
-            "s/versionCode .*/versionCode ${{ steps.version.outputs.code }}/" \
-            android/app/build.gradle
-          sed -i \
-            "s/versionName .*/versionName \"${{ steps.version.outputs.version }}\"/" \
-            android/app/build.gradle
+          python3 - << 'PYEOF'
+          import re, pathlib
 
-      # ── 8. Decode keystore ───────────────────────────────────────────────
+          p = pathlib.Path("android/app/build.gradle")
+          text = p.read_text()
+          text = re.sub(r'versionCode\s+\d+',    'versionCode ${{ steps.version.outputs.code }}',    text)
+          text = re.sub(r'versionName\s+"[^"]*"', 'versionName "${{ steps.version.outputs.version }}"', text)
+          p.write_text(text)
+          print("versionCode / versionName patched")
+          PYEOF
+
+      # ── 9. Decode keystore ───────────────────────────────────────────────
       - name: Decode keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           echo "$KEYSTORE_BASE64" | base64 --decode > android/app/vorb-release.jks
 
-      # ── 9. Build release APK ─────────────────────────────────────────────
+      # ── 10. Build release APK ────────────────────────────────────────────
       - name: Build release APK
         working-directory: android
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease \
             -Pandroid.injected.signing.store.file="$GITHUB_WORKSPACE/android/app/vorb-release.jks" \
-            -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
-            -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
-            -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}" \
+            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$KEY_PASSWORD" \
             --no-daemon \
             --stacktrace
 
-      # ── 10. Rename APK with tag ──────────────────────────────────────────
+      # ── 11. Rename APK ───────────────────────────────────────────────────
       - name: Rename APK
         run: |
           APK_SRC="android/app/build/outputs/apk/release/app-release.apk"
@@ -110,7 +169,7 @@ jobs:
           mv "$APK_SRC" "$APK_DST"
           echo "APK_PATH=$APK_DST" >> $GITHUB_ENV
 
-      # ── 11. Upload APK as workflow artifact ──────────────────────────────
+      # ── 12. Upload APK artifact ──────────────────────────────────────────
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
@@ -118,35 +177,32 @@ jobs:
           path: ${{ env.APK_PATH }}
           retention-days: 90
 
-      # ── 12. Create GitHub Release & attach APK ───────────────────────────
+      # ── 13. Create GitHub Release ────────────────────────────────────────
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name:   ${{ steps.version.outputs.tag }}
           name:       "Orb Finance ${{ steps.version.outputs.tag }}"
-          body:       |
+          body: |
             ## Orb Finance ${{ steps.version.outputs.tag }}
 
             ### Install
-            Download `vorb-${{ steps.version.outputs.tag }}.apk` below and
-            sideload it on your Android device.
+            Download `vorb-${{ steps.version.outputs.tag }}.apk` below and sideload on your Android device.
 
             > **Enable unknown sources:** Settings → Security → Install unknown apps
 
-            ### What's in this build
+            ### Build info
             - versionCode: `${{ steps.version.outputs.code }}`
             - versionName: `${{ steps.version.outputs.version }}`
-            - Built from commit: `${{ github.sha }}`
+            - Commit: `${{ github.sha }}`
           files:      ${{ env.APK_PATH }}
           draft:      false
           prerelease: ${{ contains(steps.version.outputs.tag, '-') }}
-          # tags like v1.0.0-beta automatically become pre-releases
 
-      # ── 13. Build summary ────────────────────────────────────────────────
+      # ── 14. Build summary ────────────────────────────────────────────────
       - name: Job summary
         run: |
           echo "## ✅ Build complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| Tag | \`${{ steps.version.outputs.tag }}\` |" >> $GITHUB_STEP_SUMMARY
