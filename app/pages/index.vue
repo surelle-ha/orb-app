@@ -11,7 +11,16 @@
     </div>
 
     <!-- ═══ BALANCE CARD ═══ -->
-    <div v-if="totalBalance !== 0 || totalIncome > 0"
+    <!-- Minimal style -->
+    <MinimalOrb
+      v-if="(totalBalance !== 0 || totalIncome > 0) && balanceStyle === 'minimal'"
+      :showBalance="showBalance"
+      @toggleVisibility="showBalance = !showBalance"
+      @openChat="navigate('orb')"
+    />
+
+    <!-- Supreme style (original) -->
+    <div v-if="(totalBalance !== 0 || totalIncome > 0) && balanceStyle === 'supreme'"
       class="mx-4 relative overflow-hidden rounded-3xl"
       :style="{ background:'#09090b', boxShadow: `0 8px 40px rgba(0,0,0,0.25), 0 0 0 1px ${accent}22` }">
 
@@ -120,8 +129,129 @@
       </div>
     </div>
 
+    <!-- ═══ NEON CARD style ═══ -->
+    <div v-if="(totalBalance !== 0 || totalIncome > 0) && balanceStyle === 'neon'"
+      class="mx-4 relative overflow-hidden rounded-3xl"
+      :style="{ background: `linear-gradient(135deg, #0a0a1a 0%, #0f0f28 50%, ${accent}22 100%)`, boxShadow: `0 0 0 1px ${accent}55, 0 8px 40px ${accent}30` }">
+
+      <!-- Neon grid lines -->
+      <div class="absolute inset-0 pointer-events-none overflow-hidden opacity-10"
+        :style="{ backgroundImage: `linear-gradient(${accent}40 1px, transparent 1px), linear-gradient(90deg, ${accent}40 1px, transparent 1px)`, backgroundSize: '40px 40px' }"></div>
+
+      <!-- Top glow line -->
+      <div class="absolute top-0 left-0 right-0 h-px" :style="{ background: `linear-gradient(90deg, transparent, ${accent}, transparent)`, boxShadow: `0 0 12px ${accent}` }"></div>
+
+      <div class="relative px-5 pt-5 pb-5">
+        <!-- Label row -->
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-2">
+            <div class="w-2 h-2 rounded-full" :style="{ background: accent, boxShadow: `0 0 6px ${accent}` }"></div>
+            <span class="text-[10px] font-bold uppercase tracking-[0.25em]" :style="{ color: accent }">Total Balance</span>
+          </div>
+          <button @click="aiIsReady || aiIsLoading ? navigate('orb') : navigate('settings')"
+            class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold active:scale-95 transition-transform"
+            :style="{ background: `${accent}18`, border: `1px solid ${accent}44`, color: accent }">
+            <div class="w-1.5 h-1.5 rounded-full"
+              :class="aiIsReady ? '' : aiIsLoading ? 'animate-pulse' : ''"
+              :style="{ background: aiIsReady ? accent : aiIsLoading ? '#f59e0b' : '#52525b' }"></div>
+            {{ aiIsReady ? 'Ask Orb AI' : aiIsLoading ? 'AI Loading…' : 'AI Offline' }}
+          </button>
+        </div>
+
+        <!-- Balance amount -->
+        <div class="flex items-baseline gap-2 mb-1">
+          <span class="text-[16px] font-black" :style="{ color: accent, textShadow: `0 0 12px ${accent}` }">{{ sym }}</span>
+          <span class="text-[44px] font-black tracking-tight leading-none" :style="{ color: 'white', textShadow: `0 0 20px ${accent}88` }">
+            {{ showBalance ? formatAmount(Math.abs(totalBalance)) : '•••,•••' }}
+          </span>
+          <button @click="showBalance = !showBalance" class="mb-1 active:scale-90 transition-transform">
+            <Eye    v-if="showBalance" :size="16" class="text-zinc-600" :stroke-width="2" />
+            <EyeOff v-else             :size="16" class="text-zinc-600" :stroke-width="2" />
+          </button>
+        </div>
+
+        <!-- Income / Expense row -->
+        <div class="flex items-center gap-3 mt-3">
+          <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+            style="background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.25)">
+            <TrendingUp :size="11" class="text-emerald-400" :stroke-width="2.5" />
+            <span class="text-[12px] font-bold text-emerald-400">{{ sym }}{{ formatAmount(totalIncome) }}</span>
+          </div>
+          <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+            style="background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.25)">
+            <TrendingDown :size="11" class="text-rose-400" :stroke-width="2.5" />
+            <span class="text-[12px] font-bold text-rose-400">{{ sym }}{{ formatAmount(totalExpenses) }}</span>
+          </div>
+        </div>
+
+        <!-- Insight -->
+        <p class="text-[11px] mt-3 font-medium leading-snug" style="color:rgba(255,255,255,0.35);">{{ orbInsight }}</p>
+      </div>
+
+      <!-- Bottom glow line -->
+      <div class="absolute bottom-0 left-0 right-0 h-px" :style="{ background: `linear-gradient(90deg, transparent, ${accent}88, transparent)` }"></div>
+    </div>
+
+    <!-- ═══ GLASS CARD style ═══ -->
+    <div v-if="(totalBalance !== 0 || totalIncome > 0) && balanceStyle === 'glass'"
+      class="mx-4 relative overflow-hidden rounded-3xl"
+      style="background:rgba(255,255,255,0.07);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,0.14);box-shadow:0 8px 40px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.15);">
+
+      <!-- Tinted glow blob -->
+      <div class="absolute -top-10 -right-10 w-48 h-48 rounded-full pointer-events-none"
+        :style="{ background: `radial-gradient(circle, ${accent}28 0%, transparent 70%)`, filter: 'blur(20px)' }"></div>
+
+      <div class="relative px-5 pt-5 pb-5">
+        <!-- Label row -->
+        <div class="flex items-center justify-between mb-4">
+          <p class="text-[10px] font-bold uppercase tracking-[0.25em] text-white/40">Total Balance</p>
+          <button @click="aiIsReady || aiIsLoading ? navigate('orb') : navigate('settings')"
+            class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold active:scale-95 transition-transform"
+            style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.18);"
+            :style="{ color: accent }">
+            <div class="w-1.5 h-1.5 rounded-full"
+              :class="aiIsLoading ? 'animate-pulse' : ''"
+              :style="{ background: aiIsReady ? accent : aiIsLoading ? '#f59e0b' : '#52525b' }"></div>
+            {{ aiIsReady ? 'Ask Orb AI' : aiIsLoading ? 'AI Loading…' : 'AI Offline' }}
+          </button>
+        </div>
+
+        <!-- Balance -->
+        <div class="flex items-baseline gap-2 mb-1">
+          <span class="text-[18px] font-black text-white/60">{{ sym }}</span>
+          <span :class="['text-[44px] font-black tracking-tight leading-none', totalBalance < 0 ? 'text-rose-300' : 'text-white']">
+            {{ showBalance ? formatAmount(Math.abs(totalBalance)) : '•••,•••' }}
+          </span>
+          <button @click="showBalance = !showBalance" class="mb-1 active:scale-90 transition-transform">
+            <Eye    v-if="showBalance" :size="16" class="text-white/30" :stroke-width="2" />
+            <EyeOff v-else             :size="16" class="text-white/30" :stroke-width="2" />
+          </button>
+        </div>
+
+        <!-- Income / Expense -->
+        <div class="flex items-center gap-3 mt-3">
+          <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+            style="background:rgba(52,211,153,0.12);border:1px solid rgba(52,211,153,0.2)">
+            <TrendingUp :size="11" class="text-emerald-400" :stroke-width="2.5" />
+            <span class="text-[12px] font-bold text-emerald-400">{{ sym }}{{ formatAmount(totalIncome) }}</span>
+          </div>
+          <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+            style="background:rgba(248,113,113,0.12);border:1px solid rgba(248,113,113,0.2)">
+            <TrendingDown :size="11" class="text-rose-400" :stroke-width="2.5" />
+            <span class="text-[12px] font-bold text-rose-400">{{ sym }}{{ formatAmount(totalExpenses) }}</span>
+          </div>
+        </div>
+
+        <!-- Insight pill -->
+        <div class="mt-3 px-3 py-1.5 rounded-xl inline-block"
+          style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);">
+          <p class="text-[11px] font-medium text-white/40 leading-snug">{{ orbInsight }}</p>
+        </div>
+      </div>
+    </div>
+
     <!-- ═══ EMPTY STATE ═══ -->
-    <div v-else class="mx-4 rounded-3xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm flex flex-col items-center gap-3 py-10">
+    <div v-if="totalBalance === 0 && totalIncome === 0" class="mx-4 rounded-3xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm flex flex-col items-center gap-3 py-10">
       <div class="w-14 h-14 rounded-2xl bg-violet-50 dark:bg-violet-950/40 flex items-center justify-center">
         <Wallet :size="24" class="text-violet-400" :stroke-width="1.5" />
       </div>
@@ -200,6 +330,39 @@
             <div class="h-2 bg-slate-100 dark:bg-zinc-800 rounded-full overflow-hidden">
               <div class="h-full rounded-full bg-slate-200 dark:bg-zinc-700 transition-all duration-700"
                 :style="{ width: otherPct + '%' }"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ SPENDING BY ACCOUNT ═══ -->
+    <div v-if="spendingByAccount.length > 0">
+      <div class="flex items-center justify-between px-5 pt-5 pb-2">
+        <h3 class="text-[13px] font-bold text-slate-500 dark:text-zinc-400">By Account</h3>
+        <span class="text-[11px] font-semibold text-slate-400 dark:text-zinc-600">{{ sym }}{{ formatAmount(totalExpenses) }} total</span>
+      </div>
+      <div class="mx-4 rounded-2xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm p-4">
+        <div class="space-y-3">
+          <div v-for="(acct, idx) in spendingByAccount" :key="String(acct.accountId)" class="flex items-center gap-3">
+            <div class="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0"
+              :style="{ background: accent + '18' }">
+              <CreditCard :size="13" :style="{ color: accent }" :stroke-width="2" />
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-[12px] font-bold text-slate-600 dark:text-zinc-300 truncate">{{ acct.name }}</span>
+                <span class="text-[12px] font-black text-slate-800 dark:text-zinc-100 ml-2 flex-shrink-0">{{ sym }}{{ acct.total.toLocaleString() }}</span>
+              </div>
+              <div class="h-2 bg-slate-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                <div class="h-full rounded-full transition-all duration-700"
+                  :style="{
+                    width: acctBarPct(acct.total) + '%',
+                    background: idx === 0
+                      ? accent
+                      : `rgba(${hexToRgbStr(accent)},${Math.max(0.35, 1 - idx * 0.18)})`,
+                  }"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -319,15 +482,21 @@ import {
   Utensils, ShoppingBag, Car, Gamepad2, Banknote,
 } from 'lucide-vue-next'
 import { useNav }   from '../composables/useNav'
+import { useNativeLLM } from '../composables/useNativeLLM'
+import { useDark }  from '../composables/useDark'
+import MinimalOrb  from '../components/MinimalOrb.vue'
 import {
   recentTx, quickAddOpen,
   totalBalance, totalIncome, totalExpenses,
-  spendingByCategory, transactions,
+  spendingByCategory, spendingByAccount, transactions,
   settings, CATEGORY_ICONS,
 } from '../composables/useStore'
 
 const { navigate } = useNav()
+const { isReady: aiIsReady, isLoading: aiIsLoading } = useNativeLLM()
+const { isDark }   = useDark()
 
+const balanceStyle = computed(() => settings.value.balanceStyle ?? 'supreme')
 const currentHour = ref(new Date().getHours())
 let greetingTimer: ReturnType<typeof setInterval> | null = null
 onMounted(() => {
@@ -352,6 +521,11 @@ const userInitial = computed(() => (settings.value.userName || 'O').charAt(0).to
 const orbExpanding = ref(false)
 
 async function triggerOrbExpand() {
+  // If AI not available, go to settings to enable it
+  if (!aiIsReady.value && !aiIsLoading.value) {
+    navigate('settings')
+    return
+  }
   orbExpanding.value = true
   await new Promise(r => setTimeout(r, 680))
   orbExpanding.value = false
@@ -485,7 +659,13 @@ const horizontalBars = computed(() =>
   }))
 )
 
-// ── Heatmap colour helpers ─────────────────────────────────
+// ── Spending by account bar pct ────────────────────────────
+const acctGrandTotal = computed(() =>
+  spendingByAccount.value.reduce((s, a) => s + a.total, 0)
+)
+function acctBarPct(total: number): number {
+  return acctGrandTotal.value > 0 ? Math.max(3, Math.round((total / acctGrandTotal.value) * 100)) : 0
+}
 function hexToRgb(hex: string): [number,number,number] {
   const h = hex.replace('#','')
   return [ parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16) ]

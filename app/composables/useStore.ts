@@ -36,12 +36,16 @@ export interface Settings {
   idleLockMinutes:  number   // 1–60
   accentColor:      string   // CSS hex
   userName:         string
+  balanceStyle:     'supreme' | 'minimal' | 'neon' | 'glass'
+  customCategories: string[] // user-added expense categories
 }
 const DEFAULT_SETTINGS: Settings = {
   currency:'USD', currencySymbol:'$', shakeToAdd:true,
   idleLockEnabled:false, idleLockMinutes:5,
   accentColor: '#8b5cf6',
   userName: '',
+  balanceStyle: 'supreme',
+  customCategories: [],
 }
 
 function loadSettings(): Settings {
@@ -50,7 +54,6 @@ function loadSettings(): Settings {
 }
 export const settings = ref<Settings>(loadSettings())
 
-// Persist to localStorage on every change
 watch(settings, v => {
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(v)) } catch {}
 }, { deep:true })
@@ -108,6 +111,7 @@ export interface Tx {
   accountId: number | null
   date:      string
   isoDate:   string
+  creditTx?: boolean   // true = expense paid via credit card; excluded from totalBalance
 }
 
 function formatDate(iso: string): string {
@@ -126,6 +130,17 @@ function saveTxns(list: Tx[]) {
   try { localStorage.setItem(TXNS_KEY, JSON.stringify(list)) } catch {}
 }
 
+// Helper — get account type from localStorage
+function getAccountType(accountId: number | null): string | null {
+  if (accountId == null) return null
+  try {
+    const raw = localStorage.getItem(CARDS_KEY)
+    if (!raw) return null
+    const cards = JSON.parse(raw) as any[]
+    return cards.find((c: any) => c.id === accountId)?.type ?? null
+  } catch { return null }
+}
+
 export const transactions = ref<Tx[]>(loadTxns())
 
 export const recentTx = computed(() =>
@@ -134,16 +149,30 @@ export const recentTx = computed(() =>
     .map(t => ({ ...t, icon: iconForCategory(t.category, t.amount) }))
 )
 
-export function addTx(tx: { name:string; amount:number; category:string; accountId?:number|null; isoDate?:string }) {
+export function addTx(tx: {
+  name:      string
+  amount:    number
+  category:  string
+  accountId?: number | null
+  isoDate?:  string
+}) {
   const iso = tx.isoDate ?? new Date().toISOString()
+
+  // If the account is a credit card, mark the tx so it's excluded from
+  // totalBalance (credit card spending is tracked via outstanding, not the
+  // main balance which represents real cash/asset flow).
+  const accType  = getAccountType(tx.accountId ?? null)
+  const isCreditTx = accType === 'credit'
+
   const entry: Tx = {
     id: Date.now(), name: tx.name, amount: tx.amount,
     category: tx.category, accountId: tx.accountId ?? null,
     date: formatDate(iso), isoDate: iso,
+    ...(isCreditTx ? { creditTx: true } : {}),
   }
   transactions.value.unshift(entry)
   saveTxns(transactions.value)
-  orbLog(`TX added: ${tx.name} ${tx.amount > 0 ? '+' : ''}${tx.amount}`)
+  orbLog(`TX added: ${tx.name} ${tx.amount > 0 ? '+' : ''}${tx.amount}${isCreditTx ? ' (credit)' : ''}`)
   if (tx.accountId != null) updateCardDisplayBalance(tx.accountId, tx.amount)
 }
 
@@ -157,6 +186,7 @@ export function updateCardDisplayBalance(cardId: number, amount: number) {
     const card = cards.find((c: any) => c.id === cardId)
     if (!card) return
     if (card.type === 'credit') {
+      // Expenses (negative amount) increase outstanding; income/payments decrease it
       card.outstanding = Math.max(0, (card.outstanding ?? 0) - amount)
     } else {
       card.balance = Math.max(0, (card.balance ?? 0) + amount)
@@ -167,24 +197,32 @@ export function updateCardDisplayBalance(cardId: number, amount: number) {
   } catch (e: any) { orbLog(`Card update failed: ${e?.message}`, 'error') }
 }
 
-// ── Totals ─────────────────────────────────────────────────
+// ── Totals — exclude credit-card transactions ──────────────
+// Credit card expenses are tracked via card.outstanding (liability),
+// not via the main balance. Including them would double-count.
 export const totalIncome = computed(() =>
-  transactions.value.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0)
+  transactions.value
+    .filter(t => t.amount > 0 && !t.creditTx)
+    .reduce((s, t) => s + t.amount, 0)
 )
 export const totalExpenses = computed(() =>
-  transactions.value.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
+  transactions.value
+    .filter(t => t.amount < 0 && !t.creditTx)
+    .reduce((s, t) => s + Math.abs(t.amount), 0)
 )
 export const totalBalance = computed(() =>
-  transactions.value.reduce((s, t) => s + t.amount, 0)
+  transactions.value
+    .filter(t => !t.creditTx)
+    .reduce((s, t) => s + t.amount, 0)
 )
 
-// ── Spending by category (real, computed from transactions) ─
+// ── Spending by category (real expenses only, no credit-card double-count) ─
 export interface SpendCat { category: string; total: number }
 
 export const spendingByCategory = computed((): SpendCat[] => {
   const map = new Map<string, number>()
   transactions.value
-    .filter(t => t.amount < 0)
+    .filter(t => t.amount < 0 && !t.creditTx)
     .forEach(t => {
       const prev = map.get(t.category) ?? 0
       map.set(t.category, prev + Math.abs(t.amount))
@@ -194,15 +232,36 @@ export const spendingByCategory = computed((): SpendCat[] => {
     .sort((a, b) => b.total - a.total)
 })
 
-// ── Bills ──────────────────────────────────────────────────
+// ── Spending by account ────────────────────────────────────
+export interface SpendAcct { accountId: number | null; name: string; total: number }
+
+export const spendingByAccount = computed((): SpendAcct[] => {
+  const map = new Map<number | null, number>()
+  transactions.value
+    .filter(t => t.amount < 0 && !t.creditTx)
+    .forEach(t => {
+      const prev = map.get(t.accountId) ?? 0
+      map.set(t.accountId, prev + Math.abs(t.amount))
+    })
+  // resolve account names
+  let cards: any[] = []
+  try { const r = localStorage.getItem(CARDS_KEY); if (r) cards = JSON.parse(r) } catch {}
+  return Array.from(map.entries())
+    .map(([accountId, total]) => {
+      const card = cards.find((c: any) => c.id === accountId)
+      const name = card ? (card.name || card.bank || 'Account') : 'Cash / Unlinked'
+      return { accountId, name, total }
+    })
+    .sort((a, b) => b.total - a.total)
+})
 export interface Bill {
   id:        number
   name:      string
   amount:    number
-  dueDay:    number    // day of month 1-31
+  dueDay:    number
   status:    'pending' | 'paid' | 'overdue'
-  icon:      string    // icon key
-  recurring: boolean   // auto-resets to pending next month when paid
+  icon:      string
+  recurring: boolean
 }
 
 const ICON_KEY_MAP: Record<string, any> = {
@@ -221,7 +280,7 @@ function loadBills(): Bill[] {
     const r = localStorage.getItem(BILLS_KEY)
     if (r) return JSON.parse(r)
   } catch {}
-  return []   // no seed data — user adds their own bills
+  return []
 }
 function saveBillsRaw(list: Bill[]) {
   try { localStorage.setItem(BILLS_KEY, JSON.stringify(list)) } catch {}
@@ -245,7 +304,6 @@ export function markBillPaid(id: number): void {
   const b = bills.value.find(b => b.id === id)
   if (!b) return
   b.status = 'paid'
-  // Recurring bills: schedule reset to pending on next month's due day
   if (b.recurring) {
     orbLog(`Bill paid (recurring — resets next month): ${b.name}`)
   } else {
@@ -269,7 +327,6 @@ export function refreshBillStatuses(): void {
   saveBills()
 }
 
-// Total bills due (unpaid)
 export const totalBillsDue = computed(() =>
   bills.value.filter(b => b.status !== 'paid').reduce((s, b) => s + b.amount, 0)
 )
@@ -286,22 +343,22 @@ export const goals = ref([
 ])
 
 // ── Grocery ────────────────────────────────────────────────
-export const GROCERY_KEY   = 'orb_grocery_lists_v1'
+export const GROCERY_KEY        = 'orb_grocery_lists_v1'
 export const GROCERY_BUDGET_KEY = 'orb_grocery_budget_v1'
 
 export interface GroceryItem {
-  id:        number
-  name:      string
-  qty:       string
-  price:     number
-  checked:   boolean
-  category:  string
+  id:       number
+  name:     string
+  qty:      string
+  price:    number
+  checked:  boolean
+  category: string
 }
 
 export interface GroceryList {
   id:        number
   name:      string
-  budget:    number    // 0 = no budget
+  budget:    number
   items:     GroceryItem[]
   createdAt: string
 }
@@ -333,9 +390,7 @@ export const groceryCheckedTotal = computed(() =>
   currentGroceryItems.value.filter(i => i.checked).reduce((s, i) => s + i.price, 0)
 )
 
-function saveGroceryLists() {
-  saveGroceryListsRaw(groceryLists.value)
-}
+function saveGroceryLists() { saveGroceryListsRaw(groceryLists.value) }
 
 export function addGroceryList(name: string, budget = 0): GroceryList {
   const list: GroceryList = {

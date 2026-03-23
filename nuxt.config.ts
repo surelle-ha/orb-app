@@ -5,4 +5,9 @@ export default defineNuxtConfig({
   modules: ['@nuxtjs/tailwindcss', '@nuxtjs/ionic'],
   ssr: false,
   css: ['@/assets/css/main.css'],
+  vite: {
+    optimizeDeps: {
+      include: ['@huggingface/transformers'],
+    },
+  },
 })

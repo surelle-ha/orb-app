@@ -80,7 +80,6 @@
           <span :class="['text-[14px] font-bold flex-shrink-0 mr-1', tx.amount > 0 ? 'text-emerald-500' : 'text-slate-700 dark:text-zinc-300']">
             {{ tx.amount > 0 ? '+' : '−' }}{{ sym }}{{ fmt(Math.abs(tx.amount)) }}
           </span>
-          <!-- Delete button -->
           <button @click.stop="confirmDelete(tx)"
             class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-zinc-800 flex items-center justify-center flex-shrink-0 active:bg-rose-50 dark:active:bg-rose-950/40 active:scale-90 transition-all">
             <Trash2 :size="14" class="text-slate-400 dark:text-zinc-500" :stroke-width="2" />
@@ -92,7 +91,7 @@
     <div class="h-4"></div>
   </div>
 
-  <!-- ── Delete Confirmation ── -->
+  <!-- Delete Confirmation -->
   <Teleport to="body">
     <Transition name="fade">
       <div v-if="deleteTarget"
@@ -101,8 +100,6 @@
         @click.self="deleteTarget = null">
         <div class="w-full max-w-[430px] bg-white dark:bg-zinc-900 rounded-t-[28px] border-t border-slate-200/60 dark:border-zinc-800 pb-10 px-5 pt-5">
           <div class="w-10 h-1 bg-slate-200 dark:bg-zinc-700 rounded-full self-center mx-auto mb-5"></div>
-
-          <!-- Icon + info -->
           <div class="flex items-center gap-3 mb-5 px-1">
             <div class="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/40 flex items-center justify-center flex-shrink-0">
               <Trash2 :size="20" class="text-rose-500" :stroke-width="1.8" />
@@ -115,7 +112,6 @@
               </p>
             </div>
           </div>
-
           <p class="text-[13px] text-slate-500 dark:text-zinc-400 text-center mb-6 leading-relaxed">
             This transaction will be permanently deleted and your balance will be updated.
           </p>
@@ -177,13 +173,10 @@ const grouped = computed(() => {
   }))
 })
 
-// ── Delete with confirmation ────────────────────────────
 type TxItem = typeof recentTx.value[0]
 const deleteTarget = ref<TxItem | null>(null)
 
-function confirmDelete(tx: TxItem) {
-  deleteTarget.value = tx
-}
+function confirmDelete(tx: TxItem) { deleteTarget.value = tx }
 
 function doDelete() {
   if (!deleteTarget.value) return

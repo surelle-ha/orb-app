@@ -51,7 +51,6 @@
                 class="flex-1 bg-transparent text-[22px] font-black text-white placeholder:text-zinc-700 outline-none tracking-tight"
               />
             </div>
-            <!-- Name preview -->
             <p v-if="answers.user_name" class="text-[13px] text-zinc-500 mt-3 font-medium">
               Nice to meet you, <span class="text-violet-400 font-bold">{{ answers.user_name }}</span> ✦
             </p>
@@ -180,7 +179,6 @@ import {
 } from 'lucide-vue-next'
 import { CURRENCIES, saveSettings } from '../composables/useStore'
 
-// Lazy-load DB functions — won't exist on web, gracefully ignored
 let _setProfile = async (k, v) => {}
 let _markDone   = async ()     => {}
 import('../composables/useDatabase')
@@ -189,101 +187,24 @@ import('../composables/useDatabase')
 
 const emit = defineEmits(['done'])
 
-// ── Steps ─────────────────────────────────────────────────
 const steps = [
-  // 1. Name — always first
-  {
-    key: 'user_name', type: 'name', category: 'Welcome',
-    icon: User,
-    question: "What's your name?",
-    hint: 'This is how Orb will greet you.',
-  },
-  // 2. Currency
-  {
-    key: 'currency', type: 'currency', category: 'Setup',
-    icon: Globe,
-    question: 'Your currency?',
-    hint: 'All amounts will display in this currency.',
-  },
-  // 3. Age
-  {
-    key: 'age_range', type: 'choice', category: 'About You',
-    icon: User, question: 'How old are you?',
-    hint: 'Helps personalise advice for your life stage.',
-    options: [
-      { value:'18-24', label:'18–24', emoji:'🌱' },
-      { value:'25-34', label:'25–34', emoji:'🚀' },
-      { value:'35-44', label:'35–44', emoji:'💼' },
-      { value:'45+',   label:'45+',   emoji:'🏆' },
-    ],
-  },
-  // 4. Employment
-  {
-    key: 'employment', type: 'choice', category: 'Income',
-    icon: Briefcase, question: "What's your work situation?",
-    hint: "We'll adjust cash flow tracking accordingly.",
-    options: [
-      { value:'employed',  label:'Employed',  emoji:'🏢' },
-      { value:'freelance', label:'Freelance',  emoji:'💻' },
-      { value:'business',  label:'Business',  emoji:'🏪' },
-      { value:'student',   label:'Student',   emoji:'🎓' },
-    ],
-  },
-  // 5. Monthly income
-  {
-    key: 'monthly_income', type: 'number', category: 'Income',
-    icon: DollarSign, question: 'Monthly income?',
-    hint: 'Approximate is fine.',
-    prefix: '~', placeholder: '0', suffix: '/ month',
-  },
-  // 6. Goals
-  {
-    key: 'financial_goals', type: 'multi', category: 'Goals',
-    icon: Target, question: 'What are you working toward?',
-    hint: 'Pick all that apply.',
-    options: [
-      { value:'emergency_fund', label:'Build emergency fund' },
-      { value:'debt_payoff',    label:'Pay off debt'         },
-      { value:'savings',        label:'Grow savings'         },
-      { value:'investment',     label:'Start investing'      },
-      { value:'big_purchase',   label:'Save for big purchase'},
-      { value:'retirement',     label:'Plan for retirement'  },
-    ],
-  },
-  // 7. Challenge
-  {
-    key: 'biggest_challenge', type: 'choice', category: 'Habits',
-    icon: BarChart2, question: 'Biggest money challenge?',
-    options: [
-      { value:'overspending', label:'Overspending',   emoji:'💸' },
-      { value:'no_budget',    label:'No budget plan', emoji:'📊' },
-      { value:'impulse',      label:'Impulse buying', emoji:'🛒' },
-      { value:'debt',         label:'Managing debt',  emoji:'📉' },
-    ],
-  },
-  // 8. Savings rate
-  {
-    key: 'savings_rate', type: 'slider', category: 'Savings',
-    icon: PiggyBank, question: 'Current savings rate?',
-    hint: 'What % of income do you save each month?',
-    min: 0, max: 60, step: 5, labels: ['0%','60%'],
-    presets: [{ value:0, label:'None yet' }, { value:10, label:'10%' }, { value:20, label:'20%' }],
-  },
-  // 9. Risk tolerance
-  {
-    key: 'risk_tolerance', type: 'choice', category: 'Investing',
-    icon: TrendingUp, question: 'Investment comfort level?',
-    hint: 'Affects savings goal recommendations.',
-    options: [
-      { value:'conservative', label:'Conservative', emoji:'🏦' },
-      { value:'moderate',     label:'Moderate',     emoji:'⚖️' },
-      { value:'aggressive',   label:'Aggressive',   emoji:'📈' },
-      { value:'unsure',       label:'Not sure yet', emoji:'🤔' },
-    ],
-  },
+  { key: 'user_name', type: 'name', category: 'Welcome', icon: User, question: "What's your name?", hint: 'This is how Orb will greet you.' },
+  { key: 'currency', type: 'currency', category: 'Setup', icon: Globe, question: 'Your currency?', hint: 'All amounts will display in this currency.' },
+  { key: 'age_range', type: 'choice', category: 'About You', icon: User, question: 'How old are you?', hint: 'Helps personalise advice for your life stage.',
+    options: [{ value:'18-24', label:'18–24', emoji:'🌱' }, { value:'25-34', label:'25–34', emoji:'🚀' }, { value:'35-44', label:'35–44', emoji:'💼' }, { value:'45+', label:'45+', emoji:'🏆' }] },
+  { key: 'employment', type: 'choice', category: 'Income', icon: Briefcase, question: "What's your work situation?", hint: "We'll adjust cash flow tracking accordingly.",
+    options: [{ value:'employed', label:'Employed', emoji:'🏢' }, { value:'freelance', label:'Freelance', emoji:'💻' }, { value:'business', label:'Business', emoji:'🏪' }, { value:'student', label:'Student', emoji:'🎓' }] },
+  { key: 'monthly_income', type: 'number', category: 'Income', icon: DollarSign, question: 'Monthly income?', hint: 'Approximate is fine.', prefix: '~', placeholder: '0', suffix: '/ month' },
+  { key: 'financial_goals', type: 'multi', category: 'Goals', icon: Target, question: 'What are you working toward?', hint: 'Pick all that apply.',
+    options: [{ value:'emergency_fund', label:'Build emergency fund' }, { value:'debt_payoff', label:'Pay off debt' }, { value:'savings', label:'Grow savings' }, { value:'investment', label:'Start investing' }, { value:'big_purchase', label:'Save for big purchase' }, { value:'retirement', label:'Plan for retirement' }] },
+  { key: 'biggest_challenge', type: 'choice', category: 'Habits', icon: BarChart2, question: 'Biggest money challenge?',
+    options: [{ value:'overspending', label:'Overspending', emoji:'💸' }, { value:'no_budget', label:'No budget plan', emoji:'📊' }, { value:'impulse', label:'Impulse buying', emoji:'🛒' }, { value:'debt', label:'Managing debt', emoji:'📉' }] },
+  { key: 'savings_rate', type: 'slider', category: 'Savings', icon: PiggyBank, question: 'Current savings rate?', hint: 'What % of income do you save each month?',
+    min: 0, max: 60, step: 5, labels: ['0%','60%'], presets: [{ value:0, label:'None yet' }, { value:10, label:'10%' }, { value:20, label:'20%' }] },
+  { key: 'risk_tolerance', type: 'choice', category: 'Investing', icon: TrendingUp, question: 'Investment comfort level?', hint: 'Affects savings goal recommendations.',
+    options: [{ value:'conservative', label:'Conservative', emoji:'🏦' }, { value:'moderate', label:'Moderate', emoji:'⚖️' }, { value:'aggressive', label:'Aggressive', emoji:'📈' }, { value:'unsure', label:'Not sure yet', emoji:'🤔' }] },
 ]
 
-// ── State ─────────────────────────────────────────────────
 const currentStep    = ref(1)
 const stepTransition = ref('step-forward')
 const answers = reactive({ user_name: '', currency: 'USD' })
@@ -304,7 +225,6 @@ const canProceed = computed(() => {
   return !!val
 })
 
-// ── Number input formatting ────────────────────────────────
 function formatNumberDisplay(raw: string | number | undefined): string {
   if (raw === undefined || raw === '') return ''
   const str = String(raw).replace(/,/g, '')
@@ -317,8 +237,7 @@ function onNumberInput(e: Event, key: string) {
   const el = e.target as HTMLInputElement
   let cleaned = el.value.replace(/[^0-9.]/g, '')
   const firstDot = cleaned.indexOf('.')
-  if (firstDot !== -1)
-    cleaned = cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '')
+  if (firstDot !== -1) cleaned = cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '')
   answers[key] = cleaned
   el.value = formatNumberDisplay(cleaned)
 }
@@ -336,18 +255,19 @@ const sliderLabel = computed(() => {
   return (val !== undefined ? val : s.min) + '%'
 })
 
-// ── Actions ───────────────────────────────────────────────
-function selectChoice(value) {
+// ── FIXED: No auto-proceed on choice/currency ──────────────
+// User must explicitly tap "Continue" after selecting an option.
+function selectChoice(value: string) {
   answers[currentStepData.value.key] = value
-  setTimeout(() => { if (canProceed.value) next() }, 320)
+  // No setTimeout / auto-proceed — user taps Continue
 }
 
-function selectCurrency(cur) {
+function selectCurrency(cur: typeof CURRENCIES[0]) {
   answers.currency = cur.code
-  setTimeout(() => next(), 320)
+  // No setTimeout / auto-proceed — user taps Continue
 }
 
-function toggleMulti(key, value) {
+function toggleMulti(key: string, value: string) {
   if (!answers[key]) answers[key] = []
   const idx = answers[key].indexOf(value)
   if (idx > -1) answers[key].splice(idx, 1)
@@ -366,15 +286,7 @@ async function skipAll() { await saveAndFinish() }
 async function saveAndFinish() {
   const chosen = CURRENCIES.find(c => c.code === answers.currency) || CURRENCIES[0]
   const name   = answers.user_name.trim()
-
-  // Persist to settings (available immediately across the whole app)
-  saveSettings({
-    currency:       chosen.code,
-    currencySymbol: chosen.symbol,
-    userName:       name,
-  })
-
-  // Also persist everything to SQLite profile
+  saveSettings({ currency: chosen.code, currencySymbol: chosen.symbol, userName: name })
   for (const [key, value] of Object.entries(answers)) {
     const str = Array.isArray(value) ? value.join(',') : String(value)
     await _setProfile(key, str).catch(() => {})

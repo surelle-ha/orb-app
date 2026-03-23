@@ -3,8 +3,8 @@ import { ref, readonly } from 'vue'
 
 export type PageId =
   | 'home' | 'cards' | 'grocery' | 'bills' | 'more'
-  | 'settings' | 'developer' | 'orb'
-  | 'profile' | 'randomizer' | 'transactions' | 'about'
+  | 'settings' | 'developer' | 'orb' | 'transactions'
+  | 'profile' | 'randomizer' | 'about'
 
 const TAB_ORDER: PageId[] = ['home', 'cards', 'grocery', 'bills', 'more']
 

@@ -1,7 +1,8 @@
 <template>
   <div>
-    <SplashScreen      v-if="phase === 'splash'"         @done="onSplashDone" />
-    <OnboardingScreen  v-else-if="phase === 'onboarding'" @done="onOnboardingDone" />
+    <SplashScreen     v-if="phase === 'splash'"    @done="onSplashDone" />
+    <OnboardingScreen v-else-if="phase === 'onboarding'" @done="onOnboardingDone" />
+    <AiSetupScreen    v-else-if="phase === 'ai-setup'"   @done="onAiSetupDone" />
     <template v-else>
       <Transition name="app-fade">
         <div v-if="appVisible" class="contents">
@@ -18,6 +19,7 @@
 import { ref, watch, onMounted, nextTick } from 'vue'
 import SplashScreen     from '~/components/SplashScreen.vue'
 import OnboardingScreen from '~/components/OnboardingScreen.vue'
+import AiSetupScreen    from '~/components/AiSetupScreen.vue'
 import IdleLockScreen   from '~/components/IdleLockScreen.vue'
 import PinLockScreen    from '~/components/PinLockScreen.vue'
 import { initDatabase } from '~/composables/useDatabase'
@@ -25,16 +27,20 @@ import { useDark }      from '~/composables/useDark'
 import { initIdleLock } from '~/composables/useIdleLock'
 import { settings }     from '~/composables/useStore'
 import { pinEnabled, lockWithPin } from '~/composables/usePin'
+import { AI_ENABLED_KEY } from '~/composables/useOrbAI'
+import { initNativeModel, checkModelDownloaded } from '~/composables/useNativeLLM'
 
-type Phase = 'splash' | 'onboarding' | 'app'
+type Phase = 'splash' | 'onboarding' | 'ai-setup' | 'app'
 const phase      = ref<Phase>('splash')
 const appVisible = ref(false)
+
 const ONBOARDING_KEY = 'orb_onboarding_done'
+const AI_SETUP_KEY   = 'orb_ai_setup_done_v1'
 
 const { initDark } = useDark()
 initDark()
 
-// ── Accent color injection ─────────────────────────────────
+// ── Accent color injection ──────────────────────────────────
 let accentStyleEl: HTMLStyleElement | null = null
 
 function buildAccentCSS(hex: string): string {
@@ -46,7 +52,7 @@ function buildAccentCSS(hex: string): string {
 .bg-violet-50, .dark\\:bg-violet-950\\/40 { background-color: rgba(${r},${g},${b},0.08) !important; }
 .bg-violet-100 { background-color: rgba(${r},${g},${b},0.15) !important; }
 .bg-violet-400 { background-color: rgba(${r},${g},${b},0.75) !important; }
-.bg-violet-500 { background-color: rgba(${r},${g},${b},1) !important; }
+.bg-violet-500 { background-color: rgba(${r},${g},${b},1)    !important; }
 .bg-violet-600 { background-color: rgba(${r},${g},${b},0.88) !important; }
 .bg-violet-500\\/10 { background-color: rgba(${r},${g},${b},0.10) !important; }
 .bg-violet-500\\/20 { background-color: rgba(${r},${g},${b},0.20) !important; }
@@ -54,19 +60,19 @@ function buildAccentCSS(hex: string): string {
 .bg-violet-950\\/40 { background-color: rgba(${r},${g},${b},0.08) !important; }
 .text-violet-300 { color: rgba(${r},${g},${b},0.75) !important; }
 .text-violet-400 { color: rgba(${r},${g},${b},0.85) !important; }
-.text-violet-500 { color: rgba(${r},${g},${b},1) !important; }
+.text-violet-500 { color: rgba(${r},${g},${b},1)    !important; }
 .text-violet-600 { color: rgba(${r},${g},${b},0.88) !important; }
-.border-violet-500 { border-color: rgba(${r},${g},${b},1) !important; }
-.border-violet-500\\/20 { border-color: rgba(${r},${g},${b},0.20) !important; }
-.border-violet-500\\/25 { border-color: rgba(${r},${g},${b},0.25) !important; }
-.ring-violet-400 { --tw-ring-color: rgba(${r},${g},${b},0.8) !important; }
-.ring-violet-500 { --tw-ring-color: rgba(${r},${g},${b},1) !important; }
+.border-violet-500       { border-color: rgba(${r},${g},${b},1)    !important; }
+.border-violet-500\\/20  { border-color: rgba(${r},${g},${b},0.20) !important; }
+.border-violet-500\\/25  { border-color: rgba(${r},${g},${b},0.25) !important; }
+.ring-violet-400  { --tw-ring-color: rgba(${r},${g},${b},0.8) !important; }
+.ring-violet-500  { --tw-ring-color: rgba(${r},${g},${b},1)   !important; }
 .shadow-violet-500\\/25 { --tw-shadow-color: rgba(${r},${g},${b},0.25) !important; }
 .shadow-violet-500\\/30 { --tw-shadow-color: rgba(${r},${g},${b},0.30) !important; }
 .shadow-violet-500\\/40 { --tw-shadow-color: rgba(${r},${g},${b},0.40) !important; }
 .accent-violet-500 { accent-color: rgba(${r},${g},${b},1) !important; }
 .from-violet-500 { --tw-gradient-from: rgba(${r},${g},${b},1) !important; }
-.to-violet-600 { --tw-gradient-to: rgba(${r},${g},${b},0.85) !important; }
+.to-violet-600   { --tw-gradient-to:   rgba(${r},${g},${b},0.85) !important; }
   `.trim()
 }
 
@@ -81,7 +87,7 @@ function injectAccent(hex: string) {
 }
 
 injectAccent(settings.value.accentColor)
-watch(() => settings.value.accentColor, (hex) => { injectAccent(hex) }, { immediate: false })
+watch(() => settings.value.accentColor, hex => injectAccent(hex), { immediate: false })
 
 onMounted(async () => {
   try {
@@ -91,23 +97,53 @@ onMounted(async () => {
   initDatabase().catch(e => console.warn('[Orb] DB init:', e))
 })
 
+// ── After splash: check onboarding → ai-setup → app ─────────
 async function onSplashDone() {
-  let done = false
-  try { done = localStorage.getItem(ONBOARDING_KEY) === 'true' } catch {}
-  phase.value = done ? 'app' : 'onboarding'
-  if (done) {
-    initIdleLock()
-    // Lock with PIN on app open if PIN is enabled
-    if (pinEnabled.value) lockWithPin()
-    await nextTick()
-    setTimeout(() => { appVisible.value = true }, 40)
+  let onboardingDone = false
+  try { onboardingDone = localStorage.getItem(ONBOARDING_KEY) === 'true' } catch {}
+
+  if (!onboardingDone) {
+    phase.value = 'onboarding'
+    return
   }
+
+  // Check if AI setup has been shown before
+  let aiSetupDone = false
+  try { aiSetupDone = localStorage.getItem(AI_SETUP_KEY) === 'true' } catch {}
+
+  if (!aiSetupDone) {
+    phase.value = 'ai-setup'
+    return
+  }
+
+  // If AI was enabled and model is downloaded, warm it up silently in background
+  try {
+    const aiOn = localStorage.getItem(AI_ENABLED_KEY) === 'true'
+    if (aiOn) {
+      checkModelDownloaded().then(({ downloaded }) => {
+        if (downloaded) initNativeModel().catch(() => {})
+      }).catch(() => {})
+    }
+  } catch {}
+
+  await enterApp()
 }
 
 async function onOnboardingDone() {
   try { localStorage.setItem(ONBOARDING_KEY, 'true') } catch {}
+  // Show AI setup for new users
+  phase.value = 'ai-setup'
+}
+
+async function onAiSetupDone() {
+  try { localStorage.setItem(AI_SETUP_KEY, 'true') } catch {}
+  await enterApp()
+}
+
+async function enterApp() {
   phase.value = 'app'
   initIdleLock()
+  if (pinEnabled.value) lockWithPin()
   await nextTick()
   setTimeout(() => { appVisible.value = true }, 40)
 }

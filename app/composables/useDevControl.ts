@@ -1,30 +1,26 @@
 // composables/useDevControl.ts
+import { ref } from 'vue'
 import { orbLog } from './useStore'
 
-export const resetLog: string[] = []
+export const resetLog = ref<string[]>([])
 
 function log(msg: string) {
-  resetLog.push(msg)
+  resetLog.value.push(msg)
   orbLog(msg, msg.includes('failed') || msg.includes('Error') ? 'error' : 'info')
 }
 
 export async function resetAll(): Promise<string[]> {
-  resetLog.length = 0
+  resetLog.value = []
   log('Starting full data reset…')
 
-  // 1. localStorage — PRIMARY source of truth
   try {
     const keys = Object.keys(localStorage)
     keys.forEach(k => localStorage.removeItem(k))
     log(`localStorage cleared (${keys.length} keys) ✓`)
-  } catch (e: any) {
-    log(`localStorage failed: ${e?.message}`)
-  }
+  } catch (e: any) { log(`localStorage failed: ${e?.message}`) }
 
-  // 2. sessionStorage
   try { sessionStorage.clear(); log('sessionStorage cleared ✓') } catch {}
 
-  // 3. SQLite (Capacitor — best effort, not critical)
   try {
     const { CapacitorSQLite, SQLiteConnection } = await import('@capacitor-community/sqlite')
     const sqlite = new SQLiteConnection(CapacitorSQLite)
@@ -37,11 +33,8 @@ export async function resetAll(): Promise<string[]> {
     await db.close()
     await sqlite.closeAllConnections()
     log('SQLite wiped ✓')
-  } catch (e: any) {
-    log(`SQLite: ${e?.message ?? 'not available (web)'}`)
-  }
+  } catch (e: any) { log(`SQLite: ${e?.message ?? 'not available (web)'}`) }
 
-  // 4. IndexedDB (jeep-sqlite web fallback)
   try {
     const dbs = await indexedDB.databases?.()
     if (dbs?.length) {
@@ -56,12 +49,12 @@ export async function resetAll(): Promise<string[]> {
   } catch { log('IndexedDB enum not supported') }
 
   log('✅ Reset complete — reloading in 1.5s')
-  return [...resetLog]
+  return [...resetLog.value]
 }
 
 export function useDevControl() {
   if (typeof window !== 'undefined') {
-    ;(window as any).__orbReset = resetAll
+    (window as any).__orbReset = resetAll
   }
   return { resetAll, resetLog }
 }

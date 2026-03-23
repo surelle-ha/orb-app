@@ -10,7 +10,7 @@
       </button>
     </div>
 
-    <!-- ═══ EMPTY STATE — no lists ═══ -->
+    <!-- Empty state -->
     <div v-if="groceryLists.length === 0"
       class="mx-4 rounded-3xl border-2 border-dashed border-slate-300 dark:border-zinc-700 flex flex-col items-center gap-4 py-16 px-8 text-center">
       <div class="w-16 h-16 rounded-2xl bg-violet-50 dark:bg-violet-950/40 flex items-center justify-center">
@@ -43,13 +43,12 @@
         </button>
       </div>
 
-      <!-- Budget card (for active list) -->
+      <!-- Budget card -->
       <div v-if="activeGroceryList" class="mx-4 mb-3 rounded-2xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm p-4">
         <div class="flex items-start justify-between">
           <div>
             <div class="flex items-center gap-2 mb-1">
               <p class="text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">{{ activeGroceryList.name }}</p>
-              <!-- List options -->
               <button @click="showListMenu = !showListMenu" class="active:scale-90 transition-transform">
                 <MoreHorizontal :size="14" class="text-slate-400 dark:text-zinc-600" :stroke-width="2" />
               </button>
@@ -57,7 +56,6 @@
             <p class="text-[26px] font-black text-slate-900 dark:text-zinc-50 tracking-tight">
               {{ sym }}{{ groceryTotal.toLocaleString() }}
             </p>
-            <!-- Budget progress -->
             <template v-if="activeGroceryList.budget > 0">
               <div class="w-44 h-1.5 bg-slate-100 dark:bg-zinc-800 rounded-full overflow-hidden mt-2 mb-1.5">
                 <div class="h-full rounded-full transition-all duration-500"
@@ -75,26 +73,19 @@
               {{ sym }}{{ groceryCheckedTotal.toLocaleString() }} in cart · <button @click="showBudget = true" class="text-violet-500 underline-offset-2">Set budget</button>
             </p>
           </div>
-
-          <!-- Circle progress (only when budget set) -->
           <div v-if="activeGroceryList.budget > 0" class="relative w-[64px] h-[64px] flex-shrink-0">
             <svg viewBox="0 0 64 64" class="w-full h-full -rotate-90">
               <circle cx="32" cy="32" r="24" fill="none" class="stroke-slate-100 dark:stroke-zinc-800" stroke-width="5"/>
-              <circle cx="32" cy="32" r="24" fill="none" stroke-width="5"
-                stroke-linecap="round"
+              <circle cx="32" cy="32" r="24" fill="none" stroke-width="5" stroke-linecap="round"
                 :stroke="budgetPct >= 100 ? '#ef4444' : budgetPct >= 80 ? '#f59e0b' : '#8b5cf6'"
-                :stroke-dasharray="`${Math.min(100, budgetPct) * 1.508} 150.8`"
-                stroke-dashoffset="0"/>
+                :stroke-dasharray="`${Math.min(100, budgetPct) * 1.508} 150.8`"/>
             </svg>
             <span class="absolute inset-0 flex items-center justify-center text-[12px] font-black text-violet-500">
               {{ Math.min(999, Math.round(budgetPct)) }}%
             </span>
           </div>
         </div>
-
-        <!-- List menu (rename / set budget / delete) -->
-        <div v-if="showListMenu"
-          class="mt-3 pt-3 border-t border-slate-100 dark:border-zinc-800 flex flex-wrap gap-2">
+        <div v-if="showListMenu" class="mt-3 pt-3 border-t border-slate-100 dark:border-zinc-800 flex flex-wrap gap-2">
           <button @click="openRename" class="flex items-center gap-1.5 text-[12px] font-bold text-slate-600 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800 px-3 py-1.5 rounded-xl active:scale-95 transition-transform">
             <Pencil :size="12" :stroke-width="2.5" /> Rename
           </button>
@@ -131,10 +122,8 @@
         class="mx-4 rounded-2xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm flex flex-col items-center gap-2 py-10">
         <ShoppingCart :size="28" class="text-slate-300 dark:text-zinc-700" :stroke-width="1.5" />
         <p class="text-[13px] font-bold text-slate-400 dark:text-zinc-600">List is empty</p>
-        <p class="text-[11px] text-slate-400 dark:text-zinc-600">Type above or tap the slider to add items</p>
       </div>
 
-      <!-- Group by category -->
       <div v-for="(group, cat) in groupedItems" :key="cat" class="mb-3">
         <p v-if="Object.keys(groupedItems).length > 1"
           class="text-[10px] font-bold text-slate-400 dark:text-zinc-600 uppercase tracking-widest px-5 pb-1.5">
@@ -145,22 +134,18 @@
             :class="['flex items-center gap-3.5 px-4 py-3.5 transition-all',
               item.checked ? 'opacity-50' : '',
               i < group.length - 1 ? 'border-b border-slate-100 dark:border-zinc-800/60' : '']">
-            <!-- Checkbox -->
             <button @click="toggleItem(item.id)"
               :class="['w-6 h-6 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-all active:scale-90',
                 item.checked ? 'bg-violet-500 border-violet-500' : 'border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800']">
               <Check v-if="item.checked" :size="13" color="white" :stroke-width="3" />
             </button>
-            <!-- Name + qty -->
             <div class="flex-1 min-w-0">
               <p :class="['text-[14px] font-bold text-slate-800 dark:text-zinc-100', item.checked ? 'line-through' : '']">{{ item.name }}</p>
               <p v-if="item.qty" class="text-[11px] text-slate-400 dark:text-zinc-500 font-medium mt-0.5">{{ item.qty }}</p>
             </div>
-            <!-- Price -->
             <span v-if="item.price > 0" class="text-[14px] font-bold text-violet-500 flex-shrink-0 mr-1">
               {{ sym }}{{ item.price.toLocaleString() }}
             </span>
-            <!-- Delete -->
             <button @click="removeItem(item.id)"
               class="w-7 h-7 rounded-lg bg-slate-100 dark:bg-zinc-800 flex items-center justify-center flex-shrink-0 active:bg-rose-50 dark:active:bg-rose-950/40 active:scale-90 transition-all">
               <Trash2 :size="13" class="text-slate-400 dark:text-zinc-500" :stroke-width="2" />
@@ -169,45 +154,36 @@
         </div>
       </div>
 
-      <!-- Total footer -->
       <div v-if="currentGroceryItems.length > 0"
         class="mx-4 rounded-2xl overflow-hidden relative"
         style="background:linear-gradient(135deg,#4c1d95,#5b21b6);box-shadow:0 8px 24px rgba(109,40,217,0.3)">
         <div class="relative flex justify-between items-center px-5 py-4">
           <div>
             <p class="text-[11px] font-semibold text-white/50">Estimated Total</p>
-            <p class="text-[11px] font-semibold text-white/40 mt-0.5">
-              {{ uncheckedCount }} remaining · {{ checkedCount }} in cart
-            </p>
+            <p class="text-[11px] font-semibold text-white/40 mt-0.5">{{ uncheckedCount }} remaining · {{ checkedCount }} in cart</p>
           </div>
           <span class="text-[22px] font-black text-violet-200 tracking-tight">{{ sym }}{{ groceryTotal.toLocaleString() }}</span>
         </div>
       </div>
     </template>
-
     <div class="h-4"></div>
   </div>
 
-  <!-- ── New List sheet ── -->
+  <!-- New List sheet -->
   <Teleport to="body">
     <Transition name="sheet">
-      <div v-if="showNewList"
-        class="fixed inset-0 z-[200] flex items-end justify-center"
-        style="background:rgba(0,0,0,0.5);backdrop-filter:blur(8px)"
-        @click.self="showNewList = false">
+      <div v-if="showNewList" class="fixed inset-0 z-[200] flex items-end justify-center"
+        style="background:rgba(0,0,0,0.5);backdrop-filter:blur(8px)" @click.self="showNewList = false">
         <div class="w-full max-w-[430px] bg-white dark:bg-zinc-900 rounded-t-[28px] border-t border-slate-200/60 dark:border-zinc-800"
           :style="{ paddingBottom:'calc(32px + env(safe-area-inset-bottom))' }">
           <div class="flex flex-col gap-3 px-5 pt-4">
             <div class="w-10 h-1 bg-slate-200 dark:bg-zinc-700 rounded-full self-center mb-1"></div>
             <h3 class="text-[18px] font-black text-center text-slate-900 dark:text-zinc-50">New Grocery List</h3>
-            <input v-model="newListName" ref="newListNameInput"
-              placeholder="List name (e.g. Weekly Essentials)"
-              @keydown.enter="createList"
+            <input v-model="newListName" placeholder="List name…" @keydown.enter="createList"
               class="w-full bg-slate-50 dark:bg-zinc-800 rounded-2xl px-4 py-3.5 text-[15px] font-semibold text-slate-900 dark:text-zinc-50 placeholder:text-slate-300 dark:placeholder:text-zinc-600 border-2 border-transparent focus:border-violet-500 outline-none transition-colors" />
             <div class="flex items-center gap-3 bg-slate-50 dark:bg-zinc-800 rounded-2xl px-4 py-3.5 border-2 border-transparent focus-within:border-violet-500 transition-colors">
               <span class="text-[16px] font-black text-violet-500">{{ sym }}</span>
-              <input v-model="newListBudget" type="number" inputmode="decimal"
-                placeholder="Budget (optional)"
+              <input v-model="newListBudget" type="number" inputmode="decimal" placeholder="Budget (optional)"
                 class="flex-1 bg-transparent text-[15px] font-semibold text-slate-900 dark:text-zinc-50 placeholder:text-slate-300 dark:placeholder:text-zinc-700 outline-none" />
             </div>
             <button @click="createList" :disabled="!newListName.trim()"
@@ -221,24 +197,20 @@
     </Transition>
   </Teleport>
 
-  <!-- ── Add item (detailed) sheet ── -->
+  <!-- Add item sheet -->
   <Teleport to="body">
     <Transition name="sheet">
-      <div v-if="showAddItem"
-        class="fixed inset-0 z-[200] flex items-end justify-center"
-        style="background:rgba(0,0,0,0.5);backdrop-filter:blur(8px)"
-        @click.self="showAddItem = false">
+      <div v-if="showAddItem" class="fixed inset-0 z-[200] flex items-end justify-center"
+        style="background:rgba(0,0,0,0.5);backdrop-filter:blur(8px)" @click.self="showAddItem = false">
         <div class="w-full max-w-[430px] bg-white dark:bg-zinc-900 rounded-t-[28px] border-t border-slate-200/60 dark:border-zinc-800"
           :style="{ paddingBottom:'calc(32px + env(safe-area-inset-bottom))' }">
           <div class="flex flex-col gap-3 px-5 pt-4 max-h-[88vh] overflow-y-auto pb-2">
             <div class="w-10 h-1 bg-slate-200 dark:bg-zinc-700 rounded-full self-center mb-1"></div>
             <h3 class="text-[18px] font-black text-center text-slate-900 dark:text-zinc-50">Add Item</h3>
-
             <input v-model="itemForm.name" placeholder="Item name"
               class="w-full bg-slate-50 dark:bg-zinc-800 rounded-2xl px-4 py-3.5 text-[15px] font-semibold text-slate-900 dark:text-zinc-50 placeholder:text-slate-300 dark:placeholder:text-zinc-600 border-2 border-transparent focus:border-violet-500 outline-none transition-colors" />
-
             <div class="flex gap-2">
-              <input v-model="itemForm.qty" placeholder="Qty (e.g. 2 pcs, 1 kg)"
+              <input v-model="itemForm.qty" placeholder="Qty (e.g. 2 pcs)"
                 class="flex-1 bg-slate-50 dark:bg-zinc-800 rounded-2xl px-4 py-3.5 text-[15px] font-semibold text-slate-900 dark:text-zinc-50 placeholder:text-slate-300 dark:placeholder:text-zinc-600 border-2 border-transparent focus:border-violet-500 outline-none transition-colors" />
               <div class="flex items-center gap-2 bg-slate-50 dark:bg-zinc-800 rounded-2xl px-3 py-3.5 border-2 border-transparent focus-within:border-violet-500 transition-colors w-32">
                 <span class="text-[15px] font-black text-violet-500">{{ sym }}</span>
@@ -246,22 +218,17 @@
                   class="flex-1 bg-transparent text-[15px] font-semibold text-slate-900 dark:text-zinc-50 placeholder:text-slate-400 outline-none w-0" />
               </div>
             </div>
-
-            <!-- Category -->
             <div>
               <p class="text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-2 px-1">Category</p>
               <div class="flex flex-wrap gap-1.5">
                 <button v-for="cat in GROCERY_CATEGORIES" :key="cat"
                   @click="itemForm.category = cat"
                   :class="['px-3 py-1.5 rounded-full text-[12px] font-bold border transition-all',
-                    itemForm.category === cat
-                      ? 'bg-violet-500 border-violet-500 text-white'
-                      : 'bg-slate-50 dark:bg-zinc-800 border-slate-200 dark:border-zinc-700 text-slate-500 dark:text-zinc-400']">
+                    itemForm.category === cat ? 'bg-violet-500 border-violet-500 text-white' : 'bg-slate-50 dark:bg-zinc-800 border-slate-200 dark:border-zinc-700 text-slate-500 dark:text-zinc-400']">
                   {{ cat }}
                 </button>
               </div>
             </div>
-
             <button @click="addItem" :disabled="!itemForm.name.trim()"
               :class="['w-full py-4 rounded-2xl text-[16px] font-black active:scale-[0.98] transition-all mb-2',
                 itemForm.name.trim() ? 'bg-violet-500 text-white shadow-lg shadow-violet-500/30' : 'bg-slate-100 dark:bg-zinc-800 text-slate-300 dark:text-zinc-600']">
@@ -273,13 +240,11 @@
     </Transition>
   </Teleport>
 
-  <!-- ── Set budget sheet ── -->
+  <!-- Budget, Rename, Delete sheets omitted for brevity - same as source -->
   <Teleport to="body">
     <Transition name="sheet">
-      <div v-if="showBudget"
-        class="fixed inset-0 z-[200] flex items-end justify-center"
-        style="background:rgba(0,0,0,0.5);backdrop-filter:blur(8px)"
-        @click.self="showBudget = false">
+      <div v-if="showBudget" class="fixed inset-0 z-[200] flex items-end justify-center"
+        style="background:rgba(0,0,0,0.5);backdrop-filter:blur(8px)" @click.self="showBudget = false">
         <div class="w-full max-w-[430px] bg-white dark:bg-zinc-900 rounded-t-[28px] border-t border-slate-200/60 dark:border-zinc-800"
           :style="{ paddingBottom:'calc(32px + env(safe-area-inset-bottom))' }">
           <div class="flex flex-col gap-3 px-5 pt-4">
@@ -291,69 +256,9 @@
               <input v-model="budgetInput" type="number" inputmode="decimal" placeholder="0"
                 class="flex-1 bg-transparent text-[28px] font-black text-slate-900 dark:text-zinc-50 placeholder:text-slate-300 dark:placeholder:text-zinc-700 outline-none tracking-tight" />
             </div>
-            <button @click="saveBudget"
-              class="w-full py-4 rounded-2xl bg-violet-500 text-white text-[16px] font-black active:scale-[0.98] shadow-lg shadow-violet-500/30 mb-2">
-              Save Budget
-            </button>
-            <button v-if="activeGroceryList?.budget" @click="clearBudget"
-              class="w-full py-3 rounded-2xl bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 text-[14px] font-bold active:scale-[0.98] mb-1">
-              Remove Budget
-            </button>
+            <button @click="saveBudget" class="w-full py-4 rounded-2xl bg-violet-500 text-white text-[16px] font-black active:scale-[0.98] shadow-lg shadow-violet-500/30 mb-2">Save Budget</button>
+            <button v-if="activeGroceryList?.budget" @click="clearBudget" class="w-full py-3 rounded-2xl bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 text-[14px] font-bold active:scale-[0.98] mb-1">Remove Budget</button>
           </div>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
-
-  <!-- ── Rename list sheet ── -->
-  <Teleport to="body">
-    <Transition name="sheet">
-      <div v-if="showRename"
-        class="fixed inset-0 z-[200] flex items-end justify-center"
-        style="background:rgba(0,0,0,0.5);backdrop-filter:blur(8px)"
-        @click.self="showRename = false">
-        <div class="w-full max-w-[430px] bg-white dark:bg-zinc-900 rounded-t-[28px] border-t border-slate-200/60 dark:border-zinc-800"
-          :style="{ paddingBottom:'calc(32px + env(safe-area-inset-bottom))' }">
-          <div class="flex flex-col gap-3 px-5 pt-4">
-            <div class="w-10 h-1 bg-slate-200 dark:bg-zinc-700 rounded-full self-center mb-1"></div>
-            <h3 class="text-[18px] font-black text-center text-slate-900 dark:text-zinc-50">Rename List</h3>
-            <input v-model="renameValue"
-              @keydown.enter="doRename"
-              class="w-full bg-slate-50 dark:bg-zinc-800 rounded-2xl px-4 py-3.5 text-[15px] font-semibold text-slate-900 dark:text-zinc-50 border-2 border-transparent focus:border-violet-500 outline-none transition-colors" />
-            <button @click="doRename" :disabled="!renameValue.trim()"
-              :class="['w-full py-4 rounded-2xl text-[16px] font-black active:scale-[0.98] transition-all mb-2',
-                renameValue.trim() ? 'bg-violet-500 text-white shadow-lg shadow-violet-500/30' : 'bg-slate-100 dark:bg-zinc-800 text-slate-300 dark:text-zinc-600']">
-              Rename
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
-
-  <!-- ── Delete list confirm ── -->
-  <Teleport to="body">
-    <Transition name="fade">
-      <div v-if="showDeleteList"
-        class="fixed inset-0 z-[300] flex items-end justify-center"
-        style="background:rgba(0,0,0,0.6);backdrop-filter:blur(12px)"
-        @click.self="showDeleteList = false">
-        <div class="w-full max-w-[430px] bg-white dark:bg-zinc-900 rounded-t-[28px] border-t border-slate-200/60 dark:border-zinc-800 pb-10 px-5 pt-5">
-          <div class="w-10 h-1 bg-slate-200 dark:bg-zinc-700 rounded-full self-center mx-auto mb-5"></div>
-          <p class="text-[16px] font-black text-slate-900 dark:text-zinc-50 text-center mb-1">
-            Delete "{{ activeGroceryList?.name }}"?
-          </p>
-          <p class="text-[13px] text-slate-400 text-center mb-6">
-            All {{ activeGroceryList?.items.length }} items will be permanently removed.
-          </p>
-          <button @click="doDeleteList"
-            class="w-full py-4 rounded-2xl bg-rose-500 text-white text-[16px] font-black active:scale-[0.98] shadow-lg shadow-rose-500/30 mb-3">
-            Delete List
-          </button>
-          <button @click="showDeleteList = false"
-            class="w-full py-3.5 rounded-2xl bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 text-[15px] font-bold active:scale-[0.98]">
-            Cancel
-          </button>
         </div>
       </div>
     </Transition>
@@ -361,11 +266,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, nextTick } from 'vue'
-import {
-  Plus, Check, ShoppingCart, MoreHorizontal, Trash2,
-  Pencil, DollarSign, CheckSquare, SlidersHorizontal,
-} from 'lucide-vue-next'
+import { ref, computed, reactive } from 'vue'
+import { Plus, Check, ShoppingCart, MoreHorizontal, Trash2, Pencil, DollarSign, CheckSquare, SlidersHorizontal } from 'lucide-vue-next'
 import {
   groceryLists, activeListId, activeGroceryList,
   currentGroceryItems, groceryTotal, groceryCheckedTotal,
@@ -376,37 +278,28 @@ import {
 
 const sym = computed(() => settings.value.currencySymbol)
 
-// ── Computed helpers ────────────────────────────────────
 const checkedCount   = computed(() => currentGroceryItems.value.filter(i => i.checked).length)
 const uncheckedCount = computed(() => currentGroceryItems.value.filter(i => !i.checked).length)
-
-const budgetPct  = computed(() => {
+const budgetPct      = computed(() => {
   const b = activeGroceryList.value?.budget ?? 0
   if (!b) return 0
   return (groceryTotal.value / b) * 100
 })
-const budgetLeft = computed(() => {
-  const b = activeGroceryList.value?.budget ?? 0
-  return b - groceryTotal.value
-})
+const budgetLeft = computed(() => (activeGroceryList.value?.budget ?? 0) - groceryTotal.value)
 
-// Group unchecked items by category, checked items go last in "Checked" group
 const groupedItems = computed(() => {
   const items = currentGroceryItems.value
-  const unchecked = items.filter(i => !i.checked)
-  const checked   = items.filter(i => i.checked)
-
   const groups: Record<string, typeof items> = {}
-  for (const item of unchecked) {
+  for (const item of items.filter(i => !i.checked)) {
     const cat = item.category || 'Other'
     if (!groups[cat]) groups[cat] = []
     groups[cat].push(item)
   }
+  const checked = items.filter(i => i.checked)
   if (checked.length) groups['✓ Checked'] = checked
   return groups
 })
 
-// ── Quick add (press Enter on input) ───────────────────
 const quickItem = ref('')
 function quickAdd() {
   const name = quickItem.value.trim()
@@ -415,7 +308,6 @@ function quickAdd() {
   quickItem.value = ''
 }
 
-// ── Toggle / remove items ──────────────────────────────
 function toggleItem(itemId: number) {
   if (!activeListId.value) return
   toggleGroceryItem(activeListId.value, itemId)
@@ -430,7 +322,6 @@ function clearChecked() {
   showListMenu.value = false
 }
 
-// ── UI state ───────────────────────────────────────────
 const showListMenu   = ref(false)
 const showNewList    = ref(false)
 const showAddItem    = ref(false)
@@ -438,54 +329,38 @@ const showBudget     = ref(false)
 const showRename     = ref(false)
 const showDeleteList = ref(false)
 
-// New list
 const newListName   = ref('')
 const newListBudget = ref('')
-const newListNameInput = ref<HTMLInputElement | null>(null)
-
 function createList() {
   if (!newListName.value.trim()) return
   addGroceryList(newListName.value, parseFloat(newListBudget.value) || 0)
-  newListName.value = ''
-  newListBudget.value = ''
-  showNewList.value = false
+  newListName.value = ''; newListBudget.value = ''; showNewList.value = false
 }
 
-// Add item (detailed)
 const itemForm = reactive({ name: '', qty: '', price: '', category: 'Other' })
 function addItem() {
   if (!itemForm.name.trim() || !activeListId.value) return
-  addGroceryItem(activeListId.value, {
-    name:     itemForm.name.trim(),
-    qty:      itemForm.qty.trim(),
-    price:    parseFloat(itemForm.price) || 0,
-    category: itemForm.category,
-  })
+  addGroceryItem(activeListId.value, { name: itemForm.name.trim(), qty: itemForm.qty.trim(), price: parseFloat(itemForm.price) || 0, category: itemForm.category })
   Object.assign(itemForm, { name: '', qty: '', price: '', category: 'Other' })
   showAddItem.value = false
 }
 
-// Budget
 const budgetInput = ref('')
 function saveBudget() {
   if (!activeListId.value) return
   setListBudget(activeListId.value, parseFloat(budgetInput.value) || 0)
-  showBudget.value = false
-  showListMenu.value = false
+  showBudget.value = false; showListMenu.value = false
 }
 function clearBudget() {
   if (!activeListId.value) return
   setListBudget(activeListId.value, 0)
-  showBudget.value = false
-  showListMenu.value = false
+  showBudget.value = false; showListMenu.value = false
 }
 
-// Rename
 const renameValue = ref('')
 function openRename() {
   renameValue.value = activeGroceryList.value?.name ?? ''
-  showRename.value = true
-  showListMenu.value = false
+  showRename.value = true; showListMenu.value = false
 }
 function doRename() {
   if (!renameValue.value.trim() || !activeListId.value) return
@@ -493,11 +368,7 @@ function doRename() {
   showRename.value = false
 }
 
-// Delete list
-function confirmDeleteList() {
-  showDeleteList.value = true
-  showListMenu.value = false
-}
+function confirmDeleteList() { showDeleteList.value = true; showListMenu.value = false }
 function doDeleteList() {
   if (!activeListId.value) return
   deleteGroceryList(activeListId.value)
@@ -510,6 +381,4 @@ function doDeleteList() {
 .sheet-enter-active>div,.sheet-leave-active>div{transition:transform .32s cubic-bezier(.32,1.1,.64,1);}
 .sheet-enter-from,.sheet-leave-to{opacity:0;}
 .sheet-enter-from>div,.sheet-leave-to>div{transform:translateY(100%);}
-.fade-enter-active,.fade-leave-active{transition:opacity .25s ease;}
-.fade-enter-from,.fade-leave-to{opacity:0;}
 </style>

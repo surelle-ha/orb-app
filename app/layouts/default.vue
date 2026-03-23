@@ -57,6 +57,7 @@
 
   <Teleport to="body">
     <AddTransactionSheet />
+    <AiDownloadPill />
   </Teleport>
 </template>
 
@@ -68,6 +69,7 @@ import { useDark }      from '../composables/useDark'
 import { quickAddOpen, settings, orbLog, overdueBillsCount } from '../composables/useStore'
 import { useShake }     from '../composables/useShake'
 import AddTransactionSheet from '../components/AddTransactionSheet.vue'
+import AiDownloadPill      from '../components/AiDownloadPill.vue'
 import Index        from '../pages/index.vue'
 import Cards        from '../pages/cards.vue'
 import Grocery      from '../pages/grocery.vue'
@@ -79,6 +81,7 @@ import Transactions from '../pages/transaction.vue'
 import OrbChat      from '../components/OrbChat.vue'
 import Profile      from '../pages/profile.vue'
 import Randomizer   from '../pages/randomizer.vue'
+import BuyOrNot     from '../pages/randomizer.vue'
 import About        from '../pages/about.vue'
 
 const { activePage, transitionName, navigate, TAB_ORDER } = useNav()
@@ -93,7 +96,7 @@ const PAGE_MAP: Record<string,any> = {
   settings: Settings, developer: Developer,
   transactions: Transactions, orb: OrbChat,
   profile: Profile, randomizer: Randomizer,
-  about: About,
+  buyornot: BuyOrNot, about: About,
 }
 const currentPage = computed(() => PAGE_MAP[activePage.value])
 

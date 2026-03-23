@@ -61,54 +61,90 @@
     </div>
 
     <div v-else class="mx-4 rounded-2xl overflow-hidden bg-white/70 dark:bg-zinc-900/60 backdrop-blur border border-slate-200/60 dark:border-zinc-800/60 shadow-sm">
-      <div v-for="(bill, i) in filteredBills" :key="bill.id"
-        :class="['flex items-center gap-3 px-4 py-3.5 transition-colors',
-          i < filteredBills.length - 1 ? 'border-b border-slate-100 dark:border-zinc-800/60' : '']">
+      <div v-for="(bill, i) in filteredBills" :key="bill.id">
+        <!-- Main bill row -->
+        <div
+          :class="['flex items-center gap-3 px-4 py-3.5 transition-colors',
+            i < filteredBills.length - 1 || expandedBill === bill.id ? 'border-b border-slate-100 dark:border-zinc-800/60' : '']">
 
-        <!-- Icon -->
-        <div :class="['w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0',
-          bill.status === 'overdue' ? 'bg-rose-50 dark:bg-rose-950/40' :
-          bill.status === 'paid'    ? 'bg-emerald-50 dark:bg-emerald-950/40' :
-                                      'bg-violet-50 dark:bg-violet-950/40']">
-          <component :is="billIcon(bill.icon)" :size="19"
-            :class="bill.status === 'overdue' ? 'text-rose-500' : bill.status === 'paid' ? 'text-emerald-500' : 'text-violet-500'"
-            :stroke-width="1.8" />
-        </div>
-
-        <!-- Info -->
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-1.5">
-            <p class="text-[14px] font-bold text-slate-800 dark:text-zinc-100">{{ bill.name }}</p>
-            <span v-if="bill.recurring"
-              class="flex-shrink-0 text-[9px] font-black text-violet-500 bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800 px-1.5 py-0.5 rounded-full uppercase tracking-wide">
-              ↻ monthly
-            </span>
+          <!-- Icon -->
+          <div :class="['w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0',
+            bill.status === 'overdue' ? 'bg-rose-50 dark:bg-rose-950/40' :
+            bill.status === 'paid'    ? 'bg-emerald-50 dark:bg-emerald-950/40' :
+                                        'bg-violet-50 dark:bg-violet-950/40']">
+            <component :is="billIcon(bill.icon)" :size="19"
+              :class="bill.status === 'overdue' ? 'text-rose-500' : bill.status === 'paid' ? 'text-emerald-500' : 'text-violet-500'"
+              :stroke-width="1.8" />
           </div>
-          <p class="text-[11px] font-medium mt-0.5"
-            :class="bill.status === 'overdue' ? 'text-rose-400' : 'text-slate-400 dark:text-zinc-500'">
-            {{ bill.status === 'overdue' ? '⚠ Overdue' : bill.status === 'paid' ? '✓ Paid' : `Due ${dayLabel(bill.dueDay)}` }}
+
+          <!-- Info -->
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-1.5">
+              <p class="text-[14px] font-bold text-slate-800 dark:text-zinc-100">{{ bill.name }}</p>
+              <span v-if="bill.recurring"
+                class="flex-shrink-0 text-[9px] font-black text-violet-500 bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800 px-1.5 py-0.5 rounded-full uppercase tracking-wide">
+                ↻ monthly
+              </span>
+            </div>
+            <p class="text-[11px] font-medium mt-0.5"
+              :class="bill.status === 'overdue' ? 'text-rose-400' : 'text-slate-400 dark:text-zinc-500'">
+              {{ bill.status === 'overdue' ? '⚠ Overdue' : bill.status === 'paid' ? '✓ Paid' : `Due ${dayLabel(bill.dueDay)}` }}
+            </p>
+          </div>
+
+          <!-- Amount -->
+          <p class="text-[15px] font-black text-slate-800 dark:text-zinc-100 flex-shrink-0">
+            {{ sym }}{{ bill.amount.toLocaleString() }}
           </p>
+
+          <!-- Actions -->
+          <div class="flex items-center gap-1 flex-shrink-0">
+            <!-- Payment history toggle — only if history exists -->
+            <button v-if="billPaymentHistory(bill.id).length > 0"
+              @click="expandedBill = expandedBill === bill.id ? null : bill.id"
+              class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-zinc-800 flex items-center justify-center active:scale-90 transition-transform"
+              :title="expandedBill === bill.id ? 'Hide history' : 'Show payment history'">
+              <ChevronDown :size="14"
+                :class="['text-slate-400 dark:text-zinc-500 transition-transform', expandedBill === bill.id ? 'rotate-180' : '']"
+                :stroke-width="2" />
+            </button>
+            <button v-if="bill.status !== 'paid'"
+              @click="openPayOverlay(bill)"
+              class="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center active:scale-90 transition-transform"
+              title="Mark as paid">
+              <Check :size="15" class="text-emerald-500" :stroke-width="2.5" />
+            </button>
+            <button @click="confirmDelete(bill)"
+              class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-zinc-800 flex items-center justify-center active:scale-90 transition-transform"
+              title="Delete">
+              <Trash2 :size="14" class="text-slate-400 dark:text-zinc-500" :stroke-width="2" />
+            </button>
+          </div>
         </div>
 
-        <!-- Amount -->
-        <p class="text-[15px] font-black text-slate-800 dark:text-zinc-100 flex-shrink-0">
-          {{ sym }}{{ bill.amount.toLocaleString() }}
-        </p>
-
-        <!-- Actions -->
-        <div class="flex items-center gap-1 flex-shrink-0">
-          <button v-if="bill.status !== 'paid'"
-            @click="openPayOverlay(bill)"
-            class="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center active:scale-90 transition-transform"
-            title="Mark as paid">
-            <Check :size="15" class="text-emerald-500" :stroke-width="2.5" />
-          </button>
-          <button @click="confirmDelete(bill)"
-            class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-zinc-800 flex items-center justify-center active:scale-90 transition-transform"
-            title="Delete">
-            <Trash2 :size="14" class="text-slate-400 dark:text-zinc-500" :stroke-width="2" />
-          </button>
-        </div>
+        <!-- Collapsible payment history -->
+        <Transition name="expand">
+          <div v-if="expandedBill === bill.id"
+            class="border-b border-slate-100 dark:border-zinc-800/60 bg-slate-50 dark:bg-zinc-900/40">
+            <p class="text-[10px] font-bold text-slate-400 dark:text-zinc-600 uppercase tracking-widest px-4 pt-3 pb-1">
+              Payment History
+            </p>
+            <div v-for="(pay, pi) in billPaymentHistory(bill.id)" :key="pay.id"
+              :class="['flex items-center gap-3 px-4 py-2.5',
+                pi < billPaymentHistory(bill.id).length - 1 ? 'border-b border-slate-100/60 dark:border-zinc-800/40' : 'pb-3']">
+              <div class="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center flex-shrink-0">
+                <Check :size="12" class="text-emerald-500" :stroke-width="2.5" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-[12px] font-semibold text-slate-700 dark:text-zinc-300">{{ pay.date }}</p>
+                <p class="text-[10px] text-slate-400 dark:text-zinc-500">{{ pay.account }}</p>
+              </div>
+              <span class="text-[12px] font-bold text-emerald-600 dark:text-emerald-400 flex-shrink-0">
+                −{{ sym }}{{ Math.abs(pay.amount).toLocaleString() }}
+              </span>
+            </div>
+          </div>
+        </Transition>
       </div>
     </div>
 
@@ -125,11 +161,12 @@
         style="background:rgba(0,0,0,0.55);backdrop-filter:blur(8px)"
         @click.self="payTarget = null">
         <div class="w-full max-w-[430px] bg-white dark:bg-zinc-900 rounded-t-[28px] border-t border-slate-200/60 dark:border-zinc-800"
-          :style="{ paddingBottom:'calc(32px + env(safe-area-inset-bottom))' }">
+          :style="{ paddingBottom:'calc(32px + env(safe-area-inset-bottom))', ...paySheetStyle }"
+          @touchstart="payOnTouchStart" @touchmove="payOnTouchMove" @touchend="payOnTouchEnd">
           <div class="flex flex-col gap-4 px-5 pt-4">
 
             <!-- Handle -->
-            <div class="w-10 h-1 bg-slate-200 dark:bg-zinc-700 rounded-full self-center"></div>
+            <div class="w-10 h-1 bg-slate-200 dark:bg-zinc-700 rounded-full self-center cursor-grab"></div>
 
             <!-- Bill preview -->
             <div class="flex items-center gap-3 p-3.5 rounded-2xl"
@@ -252,9 +289,10 @@
         style="background:rgba(0,0,0,0.5);backdrop-filter:blur(8px)"
         @click.self="showAdd = false">
         <div class="w-full max-w-[430px] bg-white dark:bg-zinc-900 rounded-t-[28px] border-t border-slate-200/60 dark:border-zinc-800"
-          :style="{ paddingBottom:'calc(32px + env(safe-area-inset-bottom))' }">
+          :style="{ paddingBottom:'calc(32px + env(safe-area-inset-bottom))', ...addSheetStyle }"
+          @touchstart="addOnTouchStart" @touchmove="addOnTouchMove" @touchend="addOnTouchEnd">
           <div class="flex flex-col gap-3 px-5 pt-4">
-            <div class="w-10 h-1 bg-slate-200 dark:bg-zinc-700 rounded-full self-center mb-1"></div>
+            <div class="w-10 h-1 bg-slate-200 dark:bg-zinc-700 rounded-full self-center mb-1 cursor-grab"></div>
             <h3 class="text-[18px] font-black text-center text-slate-900 dark:text-zinc-50">Add Bill</h3>
 
             <!-- Name -->
@@ -354,13 +392,19 @@ import {
   Plus, Check, Trash2, Calendar, CalendarDays, Receipt,
   Zap, Smartphone, Wifi, Building2, Tv2, CreditCard,
   MoreHorizontal, RefreshCw, PiggyBank, Landmark, Wallet,
-  Banknote, TrendingUp,
+  Banknote, TrendingUp, ChevronDown,
 } from 'lucide-vue-next'
 import {
   bills, billIcon, addBill, markBillPaid, deleteBill,
   refreshBillStatuses, totalBillsDue, overdueBillsCount,
-  settings, addTx, cardsVersion, orbLog,
+  settings, addTx, cardsVersion, orbLog, transactions,
 } from '../composables/useStore'
+import { useSwipeDown } from '../composables/useSwipeDown'
+
+const { sheetStyle: paySheetStyle, onTouchStart: payOnTouchStart, onTouchMove: payOnTouchMove, onTouchEnd: payOnTouchEnd } =
+  useSwipeDown(() => { payTarget.value = null })
+const { sheetStyle: addSheetStyle, onTouchStart: addOnTouchStart, onTouchMove: addOnTouchMove, onTouchEnd: addOnTouchEnd } =
+  useSwipeDown(() => { showAdd.value = false })
 
 const CARDS_KEY = 'orb_cards_v1'
 const sym    = computed(() => settings.value.currencySymbol)
@@ -370,6 +414,27 @@ onMounted(() => refreshBillStatuses())
 
 const pendingCount = computed(() => bills.value.filter(b => b.status === 'pending').length)
 const paidCount    = computed(() => bills.value.filter(b => b.status === 'paid').length)
+
+// ── Collapsible history ────────────────────────────────────
+const expandedBill = ref<number | null>(null)
+
+interface PayRecord { id: number; date: string; amount: number; account: string }
+function billPaymentHistory(billId: number): PayRecord[] {
+  const bill = bills.value.find(b => b.id === billId)
+  if (!bill) return []
+  // Match transactions that look like payments for this bill
+  return transactions.value
+    .filter(t => t.amount < 0 && t.name.toLowerCase().includes(bill.name.toLowerCase()) && t.name.toLowerCase().includes('bill'))
+    .slice(0, 6)
+    .map(t => ({
+      id:      t.id,
+      date:    t.date,
+      amount:  t.amount,
+      account: t.accountId != null
+        ? (savedAccounts.value.find(a => a.id === t.accountId)?.name ?? 'Account')
+        : 'Cash',
+    }))
+}
 
 // ── Filters ────────────────────────────────────────────────
 const filters = [
@@ -556,4 +621,8 @@ function submitAdd() {
 .dropdown-enter-active,.dropdown-leave-active{transition:all .22s ease;overflow:hidden;}
 .dropdown-enter-from,.dropdown-leave-to{opacity:0;max-height:0;}
 .dropdown-enter-to,.dropdown-leave-from{opacity:1;max-height:200px;}
+/* collapsible payment history */
+.expand-enter-active,.expand-leave-active{transition:all .28s ease;overflow:hidden;}
+.expand-enter-from,.expand-leave-to{opacity:0;max-height:0;}
+.expand-enter-to,.expand-leave-from{opacity:1;max-height:400px;}
 </style>

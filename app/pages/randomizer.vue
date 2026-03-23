@@ -75,12 +75,21 @@
         <div class="flex items-center justify-between">
           <div class="flex-1">
             <div class="flex items-center gap-2">
-              <Sparkles :size="16" :style="{ color: accent }" :stroke-width="2" />
+              <Sparkles :size="16"
+                :style="{ color: aiIsReady ? accent : aiIsLoading ? '#f59e0b' : '#71717a' }"
+                :stroke-width="2" />
               <p class="text-[14px] font-bold text-slate-800 dark:text-zinc-100">AI Decide</p>
+              <!-- AI state badge -->
+              <span v-if="aiIsLoading"
+                class="text-[9px] font-black px-1.5 py-0.5 rounded-full"
+                style="background:rgba(245,158,11,0.12);color:#f59e0b;">LOADING</span>
+              <span v-else-if="!aiIsReady"
+                class="text-[9px] font-black px-1.5 py-0.5 rounded-full"
+                style="background:rgba(113,113,122,0.1);color:#71717a;">OFFLINE</span>
             </div>
             <p class="text-[11px] text-slate-400 dark:text-zinc-500 mt-0.5 ml-6">
               {{ form.useAI
-                ? 'Orb will analyse your balance, spending & goals'
+                ? (aiIsReady ? 'Orb AI analyses your balance, spending & goals' : aiIsLoading ? 'Using cloud AI until on-device loads' : 'Using Anthropic cloud AI as fallback')
                 : '🎲 Randomized — pure coin flip, no data used' }}
             </p>
           </div>
@@ -91,8 +100,12 @@
             <div :class="['absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all', form.useAI ? 'left-6' : 'left-0.5']"></div>
           </button>
         </div>
+        <!-- Context banners -->
         <p v-if="!form.useAI" class="mt-2.5 text-[11px] font-bold text-amber-500 bg-amber-50 dark:bg-amber-950/30 rounded-xl px-3 py-2 border border-amber-200 dark:border-amber-800/40">
-          ⚠ AI is OFF — the decision is completely random with no financial analysis.
+          🎲 AI is OFF — the decision is completely random with no financial analysis.
+        </p>
+        <p v-else-if="form.useAI && !aiIsReady && !aiIsLoading" class="mt-2.5 text-[11px] font-semibold text-slate-500 dark:text-zinc-500 bg-slate-50 dark:bg-zinc-800/50 rounded-xl px-3 py-2">
+          On-device AI not loaded — will use Anthropic cloud API. Enable in Settings for fully private analysis.
         </p>
       </div>
     </div>
@@ -206,15 +219,19 @@ import { ref, computed, reactive } from 'vue'
 import { ChevronLeft, Info, Sparkles, Dice5, Loader2, RotateCcw, X, Plus } from 'lucide-vue-next'
 import { useNav } from '../composables/useNav'
 import { settings, totalBalance, totalIncome, totalExpenses, spendingByCategory } from '../composables/useStore'
+import { useNativeLLM } from '../composables/useNativeLLM'
 
 const { navigate } = useNav()
 const accent = computed(() => settings.value.accentColor)
 const sym    = computed(() => settings.value.currencySymbol)
 
+// Native AI (primary) — cloud API is the fallback
+const { isReady: aiIsReady, isLoading: aiIsLoading, generate: nativeGenerate } = useNativeLLM()
+
 // ── Form ──────────────────────────────────────────────────
 const form = reactive({
   item: '', priceRaw: '', reason: '', category: 'Want',
-  useAI: true,
+  useAI: false,
 })
 
 const categories = ['Want', 'Need', 'Investment', 'Gift', 'Subscription', 'Luxury']
@@ -292,52 +309,63 @@ async function decide() {
     return
   }
 
-  const bal  = totalBalance.value
-  const inc  = totalIncome.value
-  const exp  = totalExpenses.value
-  const top  = spendingByCategory.value.slice(0,3).map(c => c.category + ' (' + sym.value + c.total.toLocaleString() + ')').join(', ')
+  const bal   = totalBalance.value
+  const inc   = totalIncome.value
+  const exp   = totalExpenses.value
+  const top   = spendingByCategory.value.slice(0,3).map(c => c.category + ' (' + sym.value + c.total.toLocaleString() + ')').join(', ')
   const price = parseFloat(form.priceRaw) || 0
   const pctOfBalance = bal > 0 ? ((price / bal) * 100).toFixed(1) : 'N/A'
 
-  const prompt = `You are a concise personal finance advisor. The user wants to decide whether to buy something.
-
-User's financial snapshot:
-- Balance: ${sym.value}${bal.toLocaleString()}
-- Monthly income: ${sym.value}${inc.toLocaleString()}
-- Monthly expenses: ${sym.value}${exp.toLocaleString()}
-- Top spending: ${top || 'none'}
-- Currency: ${settings.value.currency}
-
-Purchase request:
-- Item: ${form.item}
-- Price: ${sym.value}${price.toLocaleString()} (${pctOfBalance}% of balance)
-- Category: ${form.category}
-- Reason: ${form.reason || 'not specified'}
-
-Respond with EXACTLY this JSON format (no other text):
+  const systemPrompt = `You are a concise personal finance advisor. Respond with EXACTLY this JSON (no other text):
 {"verdict":"BUY","reasoning":"2-3 sentence explanation"}
 or
-{"verdict":"SKIP","reasoning":"2-3 sentence explanation"}
+{"verdict":"SKIP","reasoning":"2-3 sentence explanation"}`
 
-Base the decision on financial health, the price relative to income/balance, the category (Want vs Need), and the reason given. Be warm but honest.`
+  const userMsg = `User finances: Balance ${sym.value}${bal.toLocaleString()}, Income ${sym.value}${inc.toLocaleString()}/mo, Expenses ${sym.value}${exp.toLocaleString()}/mo, Top spending: ${top || 'none'}.
+Purchase: ${form.item} — ${sym.value}${price.toLocaleString()} (${pctOfBalance}% of balance), Category: ${form.category}, Reason: ${form.reason || 'not specified'}.
+Be warm but honest. Base verdict on financial health, price vs income/balance, and category (Want vs Need).`
+
+  const parseReply = (text: string): { verdict: 'BUY'|'SKIP'; reasoning: string } => {
+    const cleaned = text.replace(/\`\`\`json|\`\`\`/g, '').trim()
+    // Try JSON first
+    try { return JSON.parse(cleaned) } catch {}
+    // Fallback: extract verdict from text
+    const isBuy = /\bBUY\b/i.test(text)
+    return {
+      verdict: isBuy ? 'BUY' : 'SKIP',
+      reasoning: text.replace(/\{.*?\}/s, '').trim().slice(0, 200) || (isBuy ? 'The finances support this purchase.' : 'Better to hold off for now.'),
+    }
+  }
 
   try {
+    // ── Try native AI first ──────────────────────────────
+    if (aiIsReady.value) {
+      let reply = ''
+      await nativeGenerate(systemPrompt, userMsg, [], (t: string) => { reply += t })
+      const parsed = parseReply(reply)
+      result.value = { verdict: parsed.verdict, reasoning: parsed.reasoning, isAI: true }
+      pushHistory(parsed.verdict, true)
+      return
+    }
+
+    // ── Fallback to Anthropic cloud API ─────────────────
+    const fullPrompt = systemPrompt + '\n\n' + userMsg
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 500,
+        messages: [{ role: 'user', content: fullPrompt }],
       }),
     })
     if (!response.ok) throw new Error('API error')
     const data = await response.json()
     const text = data.content?.find((b: any) => b.type === 'text')?.text ?? ''
-    const cleaned = text.replace(/```json|```/g, '').trim()
-    const parsed = JSON.parse(cleaned)
+    const parsed = parseReply(text)
     result.value = { verdict: parsed.verdict, reasoning: parsed.reasoning, isAI: true }
     pushHistory(parsed.verdict, true)
+
   } catch {
     const verdict = Math.random() > 0.5 ? 'BUY' : 'SKIP'
     result.value = {

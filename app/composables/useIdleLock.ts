@@ -1,7 +1,4 @@
 // composables/useIdleLock.ts
-// Screen blur lock — activates after N minutes of inactivity.
-// Import and call initIdleLock() once from app.vue (after onboarding done).
-
 import { ref, watch } from 'vue'
 import { settings } from './useStore'
 
@@ -32,14 +29,12 @@ export function initIdleLock() {
   if (_initialized) return
   _initialized = true
 
-  // Reset timer on any user activity
   const handler = () => {
-    if (isLocked.value) return      // don't reset while locked
+    if (isLocked.value) return
     resetTimer()
   }
   ACTIVITY_EVENTS.forEach(e => window.addEventListener(e, handler, { passive: true }))
 
-  // React to settings changes (enable/disable, timeout change)
   watch(
     () => [settings.value.idleLockEnabled, settings.value.idleLockMinutes],
     () => {
@@ -54,7 +49,6 @@ export function initIdleLock() {
   )
 }
 
-/** Trigger the lock immediately — used by dev tools */
 export function triggerLockNow() {
   isLocked.value = true
 }
